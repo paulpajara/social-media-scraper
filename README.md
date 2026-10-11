@@ -19,6 +19,25 @@ Use `./.venv/Scripts/python.exe` for the commands below; activation is optional.
 
 ## Collection access and coverage
 
+### One-command live collection
+
+The credential placeholders for **all four sources** are in `.env.example`. The blank values deliberately disable unavailable sources. A local `.env` copy can be filled progressively; you do not need credentials for every platform to run the others. For Facebook, also supply supported `graph_version` and authorized `page_ids` in your research configuration. No credentials are included in this repository.
+
+```powershell
+# Uses the example research configuration and your local .env by default.
+# Attempt credential-ready sources; prepare and analyze the collected CSVs.
+./.venv/Scripts/python.exe -m ph_sentiment collect-live
+
+# Select sources/config explicitly when needed (repeat --platform for more).
+./.venv/Scripts/python.exe -m ph_sentiment collect-live --platform reddit --platform threads --config configs/research.toml
+```
+
+Each run creates a new timestamped directory in `data/live/`, containing per-source raw CSVs and manifests, `collection_report.csv`, `run_summary.csv`, `processed/posts.csv`, a preprocessing audit, and analysis CSVs when the configured minimum is met (200 by default). Use `--output-dir` to choose a directory or `--skip-analysis` to collect/prepare only. Explicit platform selection and automatic source selection use the same real API collectors.
+
+Missing credentials, empty search results, successful collection, and incomplete collection have distinct statuses. Every completed source is saved immediately. A later API failure retains already received records and marks that source `partial`; other selected sources continue. A run with no valid collected records exits with an actionable error and CSV readiness/status reports. No placeholder rows are added to public datasets. `research.include_comments = true` applies to Reddit/Facebook in multi-source runs; X/Threads keep their supported search-only behavior.
+
+Human sentiment evaluation remains a separate step requiring independent labels. Adding credentials enables real collection; it does not guarantee platform approval, query coverage, or sufficient records for the activity.
+
 | Source | Implemented collection | Required configuration / access |
 | --- | --- | --- |
 | Reddit | OAuth post search in configured subreddits; optional comments on matched posts | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and identifying `REDDIT_USER_AGENT`; approved API access where required |

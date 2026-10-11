@@ -14,6 +14,20 @@ The attached *Midterm Activity 1* is used as an assignment reference. The curren
 
 Use a sampling log to record collection time, search vocabulary, requested platform, actual coverage, and failures. Inspect the collection command's diagnostics and preprocessing audit. If a source is inaccessible or returns no usable records, report that limitation and obtain another authorized source. Do not treat an empty source as neutral sentiment.
 
+## One-command live workflow
+
+For the recommended automated workflow, copy `.env.example` to a local `.env`, fill the credentials for the sources you can access, and run:
+
+```console
+python -m ph_sentiment collect-live --config configs/research.example.toml
+```
+
+The command attempts Reddit, X, Threads, and Facebook independently. Blank credentials are reported as `missing_credentials`; they do not produce invented records. Results go to a new timestamped folder under `data/live` by default. Each run writes `collection_report.csv` and `run_summary.csv`; successful or partial sources write `raw/<platform>.csv` and a collection manifest. When records were returned, preparation writes `processed/posts.csv` and `processed/preprocessing_audit.csv`. Analysis runs automatically once the configured retained-record minimum is met (200 by default).
+
+Repeat `--platform` to select sources, use `--skip-analysis` to collect and prepare only, or provide `--output-dir` for a specific run folder. Existing CSV outputs require explicit `--overwrite`; a fresh folder preserves earlier runs. Inspect partial-source warnings, retained counts, actual source coverage, and analysis status before interpreting the outputs. Credentials and API permissions are still required for live observations; no live data is included merely by configuring placeholders.
+
+The notebook's separate stages remain available for manual imports and review. To inspect an automated run there, point its data paths to the selected live run's `raw`, `processed`, and `analysis` folders.
+
 ## Data preparation and quality checks
 
 The `prepare` command applies the configured date restrictions, normalizes records, and excludes unusable or duplicate material. Its audit CSV records preparation outcomes. Search queries guide collection; preparation does not establish political relevance automatically. Inspect retained samples and imported records for relevance before committing to the final corpus; overbroad queries can include unrelated uses of government or political names.
@@ -85,6 +99,7 @@ Inspect development errors before making a rule revision. Once the holdout has b
 
 | Script / command | Input | Output | Remarks |
 | --- | --- | --- | --- |
+| `python -m ph_sentiment collect-live` | Research configuration and locally filled credentials | A live run's `raw/`, `processed/`, optional `analysis/`, `collection_report.csv`, and `run_summary.csv` | Recommended one-command workflow; missing credentials, failures, and partial coverage remain explicit. |
 | `python -m ph_sentiment collect` | Research configuration and platform credentials | `data/raw/<platform>.csv` | Public records actually returned by the supported source; collection can be incomplete. |
 | `python -m ph_sentiment prepare` | One or more raw/import CSVs | `data/processed/posts.csv`, `data/processed/preprocessing_audit.csv` | Count the retained rows here toward the minimum 200. |
 | `python -m ph_sentiment analyze` | Prepared CSV | `analyzed_documents.csv` | Normalized records, topic assignment, rule sentiment, score, evidence, and model version. |
