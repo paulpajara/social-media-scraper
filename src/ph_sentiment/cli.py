@@ -22,6 +22,7 @@ def parser() -> argparse.ArgumentParser:
     subparsers = root.add_subparsers(dest="command", required=True)
     for name, help_text in (
         ("collect", "Collect through an official, credentialed social-media API"),
+        ("collect-live", "Collect available live sources, prepare CSVs, and analyze when ready"),
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
         ("analyze", "Compute topics, rule-based sentiment, and proximity measures"),
         ("label", "Create a blank human annotation CSV without model predictions"),
@@ -32,7 +33,17 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--overwrite", action="store_true", help="Explicitly replace existing outputs"
         )
-        if name == "collect":
+        if name == "collect-live":
+            command.add_argument(
+                "--platform", choices=("reddit", "x", "threads", "facebook"), action="append"
+            )
+            command.add_argument(
+                "--output-dir", type=Path, help="Defaults to a new timestamped data/live directory"
+            )
+            command.add_argument(
+                "--skip-analysis", action="store_true", help="Collect and prepare only"
+            )
+        elif name == "collect":
             command.add_argument(
                 "--platform", choices=("reddit", "x", "threads", "facebook"), required=True
             )
@@ -114,55 +125,52 @@ def _prepared_input(path: Path, config: dict, minimum: int) -> list[Record]:
 def run(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     research = config["research"]
-    if args.command == "collect":
-        from .collectors import make_collector
+    if args.command == "collect-live":
+        from .live import live_collect
+
+        output_dir = args.output_dir or Path("data/live") / datetime.now(UTC).strftime(
+            "%Y%m%dT%H%M%S%fZ"
+        )
+        result = live_collect(
+            config,
+            output_dir,
+            args.platform,
+            args.overwrite,
+            args.skip_analysis,
+            progress=lambda message: print(message, flush=True),
+        )
+        if not result.record_count:
+            raise DataValidationError(
+                f"No valid public records collected. Check credentials, access, and queries in {result.report_path}."
+            )
+        if any(row["status"] in {"partial", "failed"} for row in result.statuses):
+            print(
+                "Some sources were incomplete; inspect collection_report.csv before interpreting coverage.",
+                file=sys.stderr,
+            )
+        if result.record_count < config["analysis"]["minimum_records"]:
+            print(
+                "More records are needed before final analysis; current CSVs are preserved.",
+                file=sys.stderr,
+            )
+        elif not args.skip_analysis and not result.analysis_paths:
+            raise DataValidationError(
+                "Analysis did not complete; collected data are preserved. Inspect run_summary.csv."
+            )
+    elif args.command == "collect":
+        from .live import collect_to_csv
 
         manifest = args.output.with_name(f"{args.output.stem}_collection_manifest.csv")
         _check_outputs([args.output, manifest], [], args.overwrite)
-        collector_config = {**research, "settings": config.get(args.platform, {})}
-        collector = make_collector(args.platform, collector_config)
-        try:
-            records = collector.collect()
-            collection_warnings = " | ".join(collector.warnings)
-        finally:
-            collector.close()
-        for record in records:
-            record.validate()
-        write_records(args.output, records)
-        write_csv(
-            manifest,
-            [
-                {
-                    "platform": args.platform,
-                    "collected_at": datetime.now(UTC).isoformat(),
-                    "start_date": research["start_date"],
-                    "end_date_exclusive": research["end_date"],
-                    "date_timezone": "Asia/Manila",
-                    "requested_max_records": research.get("max_records", 1000),
-                    "collected_records": len(records),
-                    "queries": " | ".join(research["queries"]),
-                    "max_pages": research.get("max_pages", 20),
-                    "coverage": "Bounded API search sample; no claim of exhaustive coverage or population representation.",
-                    "warnings": collection_warnings,
-                }
-            ],
-            [
-                "platform",
-                "collected_at",
-                "start_date",
-                "end_date_exclusive",
-                "date_timezone",
-                "requested_max_records",
-                "collected_records",
-                "queries",
-                "max_pages",
-                "coverage",
-                "warnings",
-            ],
-        )
+        result = collect_to_csv(args.platform, config, args.output)
+        records, collection_warnings = result.records, result.warnings
         if collection_warnings:
             print(f"Collection notes: {collection_warnings}", file=sys.stderr)
         print(f"Collected {len(records)} records -> {args.output}")
+        if result.status == "partial":
+            raise DataValidationError(
+                f"Partial records preserved; collection was incomplete: {result.error}"
+            )
         if not records:
             print(
                 "No matching records returned. Check queries, date range, and API access.",
