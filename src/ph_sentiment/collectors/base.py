@@ -161,10 +161,14 @@ class HTTPClient:
             )
         self.sleep(delay)
 
-    def request_json(self, method: str, url: str, **kwargs: Any) -> Any:
+    def request_json(
+        self, method: str, url: str, *, allow_partial_errors: bool = False, **kwargs: Any
+    ) -> Any:
         api_url(url)
         if not isinstance(method, str) or method not in {"GET", "POST"}:
             raise CollectionError("Unsupported collection HTTP method.")
+        if not isinstance(allow_partial_errors, bool):
+            raise CollectionError("Partial-response handling must be true or false.")
         if {"timeout", "allow_redirects", "verify"}.intersection(kwargs):
             raise CollectionError("Collection transport safety options cannot be overridden.")
         for attempt in range(self.max_retries + 1):
@@ -206,7 +210,17 @@ class HTTPClient:
                 raise CollectionError("API returned an invalid JSON response.") from None
             finally:
                 response.close()
-            if isinstance(payload, dict) and (payload.get("error") or payload.get("errors")):
+            if isinstance(payload, dict) and (
+                payload.get("error")
+                or (
+                    payload.get("errors")
+                    and not (
+                        allow_partial_errors
+                        and isinstance(payload.get("data"), list)
+                        and payload["data"]
+                    )
+                )
+            ):
                 raise CollectionError(
                     "API reported an error; check read permissions, quota and query settings."
                 )

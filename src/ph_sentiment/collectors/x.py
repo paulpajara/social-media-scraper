@@ -74,11 +74,17 @@ class XCollector(Collector):
                 payload = self.client.request_json(
                     "GET",
                     f"https://api.x.com/2/tweets/search/{endpoint}",
+                    allow_partial_errors=True,
                     headers=headers,
                     params=params,
                 )
                 if not isinstance(payload, dict) or not isinstance(payload.get("data", []), list):
                     raise CollectionError("X returned an unexpected search response.")
+                if payload.get("errors"):
+                    self.warn(
+                        "X returned partial results with API errors; retained the available posts. "
+                        "Some requested content may be unavailable."
+                    )
                 for item in payload.get("data", []):
                     if not isinstance(item, dict):
                         raise CollectionError("X returned an unexpected search item.")
