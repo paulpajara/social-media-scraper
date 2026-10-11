@@ -202,6 +202,51 @@ def test_http_rejects_invalid_json_and_api_error_payloads(payload: Any) -> None:
     assert "secret" not in str(captured.value)
 
 
+def test_http_partial_errors_require_explicit_opt_in() -> None:
+    payload = {"data": [{"id": "101"}], "errors": [{"detail": "secret-token"}]}
+    client, _ = mocked_client(payload)
+    with pytest.raises(CollectionError) as captured:
+        client.request_json("GET", "https://api.x.com/2/tweets/search/recent")
+    assert "secret-token" not in str(captured.value)
+
+    client, session = mocked_client(payload)
+    assert (
+        client.request_json(
+            "GET", "https://api.x.com/2/tweets/search/recent", allow_partial_errors=True
+        )
+        == payload
+    )
+    assert "allow_partial_errors" not in session.calls[0][2]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"errors": [{"detail": "secret-token"}]},
+        {"data": [], "errors": [{"detail": "secret-token"}]},
+        {"data": {"id": "101"}, "errors": [{"detail": "secret-token"}]},
+        {"data": [{"id": "101"}], "error": {"message": "secret-token"}},
+    ],
+)
+def test_http_partial_opt_in_keeps_error_only_and_graph_failures_fatal(payload: Any) -> None:
+    client, _ = mocked_client(payload)
+    with pytest.raises(CollectionError) as captured:
+        client.request_json(
+            "GET", "https://api.x.com/2/tweets/search/recent", allow_partial_errors=True
+        )
+    assert "secret-token" not in str(captured.value)
+
+
+@pytest.mark.parametrize("value", ["true", 1, None])
+def test_http_partial_response_option_requires_boolean(value: Any) -> None:
+    client, session = mocked_client()
+    with pytest.raises(CollectionError, match="true or false"):
+        client.request_json(
+            "GET", "https://api.x.com/2/tweets/search/recent", allow_partial_errors=value
+        )
+    assert session.calls == []
+
+
 def test_reddit_oauth_pagination_deduplication_and_date_filter(config: dict[str, Any]) -> None:
     config["queries"] = ["government", "Marcos"]
     config["settings"] = {"subreddits": ["Philippines"]}
@@ -284,6 +329,23 @@ def test_x_archive_pagination_date_window_and_minimum_page_size(config: dict[str
     assert session.calls[0][2]["params"]["max_results"] == 10
     assert session.calls[0][2]["params"]["tweet.fields"] == "created_at,note_tweet"
     assert session.calls[1][2]["params"]["next_token"] == "next"
+
+
+def test_x_retains_partial_results_and_redacts_api_errors(config: dict[str, Any]) -> None:
+    config["settings"] = {"search_mode": "archive"}
+    client, session = mocked_client(
+        {
+            "data": [
+                {"id": "101", "text": "Government services", "created_at": "2026-02-01T00:00:00Z"}
+            ],
+            "errors": [{"detail": "secret-token-and-request-url"}],
+        }
+    )
+    collector = XCollector(config, client)
+    assert [row.record_id for row in collector.collect()] == ["x:101"]
+    assert any("partial results" in warning for warning in collector.warnings)
+    assert all("secret-token" not in warning for warning in collector.warnings)
+    assert "allow_partial_errors" not in session.calls[0][2]
 
 
 def test_x_recent_refuses_unavailable_history(config: dict[str, Any]) -> None:
