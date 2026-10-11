@@ -1,0 +1,39 @@
+# Secrets belong in the environment or an ignored .env file.
+# Dates describe Asia/Manila calendar days; end_date is exclusive.
+[research]
+start_date = "2026-01-01"
+end_date = "2027-01-01"
+max_records = 1000
+max_pages = 20
+include_comments = false
+queries = [
+  'Philippine government',
+  'Philippine administration',
+  'gobyerno',
+  'pamahalaan',
+]
+
+[analysis]
+minimum_records = 200
+n_topics = 3
+seed = 42
+max_features = 5000
+top_terms = 10
+max_pairs = 5000
+
+[reddit]
+subreddits = ["Philippines", "phinvest"]
+
+[x]
+# Recent search covers only seven days. Archive needs the appropriate API entitlement.
+search_mode = "archive"
+
+[threads]
+search_type = "RECENT"
+search_mode = "KEYWORD"
+
+[facebook]
+# Supply authorized public Page IDs and a Graph API version supported by your app.
+# No general Facebook keyword or personal-profile scraping is implemented.
+page_ids = []
+graph_version = ""
