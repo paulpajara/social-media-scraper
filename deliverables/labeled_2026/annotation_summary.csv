@@ -1,0 +1,4 @@
+﻿label,records,label_source,notes
+negative,104,ai_assisted,Independent target-polarity reference annotations; not human-validated ground truth.
+neutral,110,ai_assisted,Independent target-polarity reference annotations; not human-validated ground truth.
+positive,17,ai_assisted,Independent target-polarity reference annotations; not human-validated ground truth.

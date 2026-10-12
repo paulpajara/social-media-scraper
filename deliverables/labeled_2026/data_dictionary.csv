@@ -1,0 +1,10 @@
+﻿field,type,description
+record_id,string,Stable public post ID; Bluesky AT URIs include public author DIDs. Not an anonymous identifier.
+platform,string,Source platform: bluesky or mastodon in this snapshot.
+created_at,string,Timezone-aware ISO-8601 publication time; study calendar dates use Asia/Manila.
+text,string,Raw post text in raw files; normalized cleaned text in prepared/annotation files.
+source_url,string,HTTPS provenance URL for public post verification; may identify its author.
+query,string,Search phrase or hashtag that returned the post; not a relevance judgment.
+record_type,string,"Post type; current public collectors retrieve posts, without conversation expansion."
+collected_at,string,Timezone-aware collection timestamp; establishes the collection snapshot.
+gold_label,string,"AI-assisted target-polarity reference annotation: negative, neutral or positive; not human-validated gold truth."

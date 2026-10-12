@@ -1,0 +1,4 @@
+﻿relevance,records,label_source,notes
+include,231,ai_assisted,Included posts have resolved reference labels; excluded/unresolved posts have no sentiment label.
+exclude,96,ai_assisted,Included posts have resolved reference labels; excluded/unresolved posts have no sentiment label.
+unresolved,8,ai_assisted,Included posts have resolved reference labels; excluded/unresolved posts have no sentiment label.

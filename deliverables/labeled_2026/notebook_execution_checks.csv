@@ -1,0 +1,3 @@
+﻿check,status,observed,remarks
+offline_notebook_run_1,pass,231,All eight code cells completed; no credentials; external network blocked; five analysis and five evaluation CSVs byte-identical; labels preserved.
+offline_notebook_run_2,pass,231,All eight code cells completed; no credentials; external network blocked; five analysis and five evaluation CSVs byte-identical; labels preserved.

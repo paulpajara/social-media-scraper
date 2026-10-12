@@ -1,0 +1,4 @@
+﻿metric,numerator,denominator,value,sampling_seed,notes
+relevance_agreement,56,60,0.9333333333333333,20261012,Pre-adjudication blind AI sample agreement; not human validation or predictive accuracy. Sentiment denominator includes only posts both annotators retained.
+exact_decision_agreement,54,60,0.9,20261012,Pre-adjudication blind AI sample agreement; not human validation or predictive accuracy. Sentiment denominator includes only posts both annotators retained.
+sentiment_agreement_both_included,38,40,0.95,20261012,Pre-adjudication blind AI sample agreement; not human validation or predictive accuracy. Sentiment denominator includes only posts both annotators retained.

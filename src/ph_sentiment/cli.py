@@ -33,7 +33,7 @@ def parser() -> argparse.ArgumentParser:
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
         ("analyze", "Compute topics, rule-based sentiment, and proximity measures"),
         ("label", "Create a blank human annotation CSV without model predictions"),
-        ("evaluate", "Evaluate human labels with 90/10 split and 10-fold validation"),
+        ("evaluate", "Evaluate reference labels with 90/10 split and 10-fold validation"),
     ):
         command = subparsers.add_parser(name, help=help_text)
         command.add_argument(
@@ -90,6 +90,13 @@ def parser() -> argparse.ArgumentParser:
                 command.add_argument("--output", type=Path, required=True)
             if name == "prepare":
                 command.add_argument("--audit-output", type=Path, required=True)
+            elif name == "evaluate":
+                command.add_argument(
+                    "--label-source",
+                    choices=("human", "ai_assisted"),
+                    default="human",
+                    help="Reference annotation provenance; AI references measure agreement, not human-validated accuracy",
+                )
     return root
 
 
@@ -243,7 +250,7 @@ def run(args: argparse.Namespace) -> None:
             raise DataValidationError("Cannot annotate an empty dataset.")
         if any(record.gold_label for record in records):
             raise DataValidationError(
-                "Input already contains human labels. Preserve it instead of creating a blank template."
+                "Input already contains reference labels. Preserve it instead of creating a blank template."
             )
         write_records(args.output, records)
         print(
@@ -267,7 +274,12 @@ def run(args: argparse.Namespace) -> None:
         else:
             from .evaluation import evaluate
 
-            outputs = evaluate(records, args.output_dir, seed=config["analysis"]["seed"])
+            outputs = evaluate(
+                records,
+                args.output_dir,
+                seed=config["analysis"]["seed"],
+                label_source=args.label_source,
+            )
         for name, path in outputs.items():
             print(f"{name} -> {path}")
 

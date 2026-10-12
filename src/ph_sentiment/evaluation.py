@@ -1,4 +1,4 @@
-"""Human-label evaluation of a fixed sentiment model without data leakage."""
+"""Reference-label evaluation of a fixed sentiment model without data leakage."""
 
 from __future__ import annotations
 
@@ -23,15 +23,27 @@ from .preprocessing import clean_text, tokenize
 from .schema import LABELS, Record
 from .sentiment import SentimentClassifier
 
-_EVALUATION_NOTE = (
-    "Human labels required. Fixed lexicon model: no training or tuning; "
+LABEL_SOURCES = ("human", "ai_assisted")
+
+_MODEL_EVALUATION_NOTE = (
+    "Fixed lexicon model: no training or tuning; "
     "CV measures variation across development partitions. Holdout excluded from CV."
 )
 
 
-def _validate_records(records: Sequence[Record]) -> list[str]:
+def _evaluation_note(label_source: str) -> str:
+    provenance = (
+        "Agreement against AI-assisted reference annotations; not human-validated accuracy. "
+        if label_source == "ai_assisted"
+        else "Human labels required. "
+    )
+    return provenance + _MODEL_EVALUATION_NOTE
+
+
+def _validate_records(records: Sequence[Record], label_source: str = "human") -> list[str]:
+    label_description = "human" if label_source == "human" else "AI-assisted reference"
     if not records:
-        raise DataValidationError("Evaluation requires human-labeled records.")
+        raise DataValidationError(f"Evaluation requires {label_description}-labeled records.")
     identifiers: set[tuple[str, str]] = set()
     seen_text: dict[str, str] = {}
     labels: list[str] = []
@@ -45,8 +57,9 @@ def _validate_records(records: Sequence[Record]) -> list[str]:
         identifiers.add(identity)
         if record.gold_label not in LABELS:
             raise DataValidationError(
-                f"Record {record.record_id} needs a human gold_label: "
-                "negative, neutral, or positive. Automatic labels are not ground truth."
+                f"Record {record.record_id} needs a {label_description} gold_label: "
+                "negative, neutral, or positive. Assign reference annotations independently "
+                "of the evaluated model; automatic labels are not human ground truth."
             )
         normalized = " ".join(tokenize(clean_text(record.text)))
         if not normalized:
@@ -61,7 +74,8 @@ def _validate_records(records: Sequence[Record]) -> list[str]:
     missing = set(LABELS) - set(labels)
     if missing:
         raise DataValidationError(
-            f"Human labels must include every class; missing: {', '.join(sorted(missing))}."
+            f"{label_description.capitalize()} labels must include every class; "
+            f"missing: {', '.join(sorted(missing))}."
         )
     return labels
 
@@ -91,6 +105,7 @@ def _append_diagnostics(
     metric_rows: list[dict[str, Any]],
     report_rows: list[dict[str, Any]],
     confusion_rows: list[dict[str, Any]],
+    label_source: str,
 ) -> dict[str, float]:
     values = _metrics(actual, predicted)
     for name, value in values.items():
@@ -102,7 +117,8 @@ def _append_diagnostics(
                 "metric": name,
                 "value": value,
                 "model_version": SentimentClassifier.version,
-                "notes": _EVALUATION_NOTE,
+                "label_source": label_source,
+                "notes": _evaluation_note(label_source),
             }
         )
     precision, recall, f1, support = precision_recall_fscore_support(
@@ -122,6 +138,8 @@ def _append_diagnostics(
                 "recall": float(recall[index]),
                 "f1": float(f1[index]),
                 "support": int(support[index]),
+                "label_source": label_source,
+                "notes": _evaluation_note(label_source),
             }
         )
     matrix = confusion_matrix(actual, predicted, labels=LABELS)
@@ -134,6 +152,8 @@ def _append_diagnostics(
                     "actual_label": actual_label,
                     "predicted_label": predicted_label,
                     "count": int(matrix[left, right]),
+                    "label_source": label_source,
+                    "notes": _evaluation_note(label_source),
                 }
             )
     return values
@@ -145,21 +165,26 @@ def evaluate(
     seed: int = 42,
     holdout_fraction: float = 0.1,
     folds: int = 10,
+    label_source: str = "human",
 ) -> dict[str, Path]:
     """Reserve a stratified holdout before CV, then write auditable CSV metrics.
 
     This baseline is fixed. No model is fitted on either development or holdout
     text; CV is diagnostic rather than an estimate of retraining variability.
-    Gold labels must be independently assigned by humans. This function cannot
+    Reference labels must be assigned independently of this model. Human labels
+    are the default; AI-assisted references must be explicitly identified and
+    measure agreement rather than human-validated accuracy. This function cannot
     verify provenance, so callers must maintain their annotation audit trail.
     """
+    if label_source not in LABEL_SOURCES:
+        raise ConfigurationError("label_source must be 'human' or 'ai_assisted'.")
     if not 0.0 < holdout_fraction < 1.0:
         raise ConfigurationError("holdout_fraction must be strictly between 0 and 1.")
     if folds < 2:
         raise ConfigurationError("Evaluation needs at least two cross-validation folds.")
     if not 0 <= seed < 2**32:
         raise ConfigurationError("seed must be an integer between 0 and 2**32 - 1.")
-    labels = _validate_records(records)
+    labels = _validate_records(records, label_source)
     indices = np.arange(len(records))
     try:
         development, holdout = train_test_split(
@@ -171,7 +196,8 @@ def evaluate(
         )
     except ValueError as exc:
         raise DataValidationError(
-            "Insufficient human labels for a stratified holdout with all three classes. "
+            f"Insufficient {label_source.replace('_', '-')} labels for a stratified "
+            "holdout with all three classes. "
             "Add independently labeled examples or increase the holdout size."
         ) from exc
     development_labels = [labels[int(index)] for index in development]
@@ -213,6 +239,8 @@ def evaluate(
                 "sentiment_score": result.score,
                 "sentiment_evidence": json.dumps(result.matched_terms, ensure_ascii=False),
                 "model_version": classifier.version,
+                "label_source": label_source,
+                "notes": _evaluation_note(label_source),
             }
         return predictions
 
@@ -236,6 +264,7 @@ def evaluate(
                 metric_rows,
                 report_rows,
                 confusion_rows,
+                label_source,
             )
         )
     actual_development = [labels[int(index)] for index in development]
@@ -250,6 +279,7 @@ def evaluate(
         metric_rows,
         report_rows,
         confusion_rows,
+        label_source,
     )
     for metric in fold_metrics[0]:
         values = [fold[metric] for fold in fold_metrics]
@@ -262,7 +292,9 @@ def evaluate(
                     "metric": metric,
                     "value": float(value),
                     "model_version": classifier.version,
-                    "notes": _EVALUATION_NOTE + " Unweighted fold mean; population SD (ddof=0).",
+                    "label_source": label_source,
+                    "notes": _evaluation_note(label_source)
+                    + " Unweighted fold mean; population SD (ddof=0).",
                 }
             )
     # The fixed model and all CV predictions are already finalized at this point.
@@ -275,6 +307,7 @@ def evaluate(
         metric_rows,
         report_rows,
         confusion_rows,
+        label_source,
     )
     holdout_set = set(int(index) for index in holdout)
     assignment_rows = [
@@ -286,6 +319,8 @@ def evaluate(
             "seed": seed,
             "holdout_fraction": holdout_fraction,
             "cv_folds": folds,
+            "label_source": label_source,
+            "notes": _evaluation_note(label_source),
         }
         for index, record in enumerate(records)
     ]
@@ -306,6 +341,7 @@ def evaluate(
             "metric",
             "value",
             "model_version",
+            "label_source",
             "notes",
         ),
     )
@@ -320,6 +356,8 @@ def evaluate(
             "recall",
             "f1",
             "support",
+            "label_source",
+            "notes",
         ),
     )
     write_csv(
@@ -331,6 +369,8 @@ def evaluate(
             "actual_label",
             "predicted_label",
             "count",
+            "label_source",
+            "notes",
         ),
     )
     write_csv(
@@ -344,6 +384,8 @@ def evaluate(
             "seed",
             "holdout_fraction",
             "cv_folds",
+            "label_source",
+            "notes",
         ),
     )
     write_csv(
@@ -359,6 +401,8 @@ def evaluate(
             "sentiment_score",
             "sentiment_evidence",
             "model_version",
+            "label_source",
+            "notes",
         ),
     )
     return paths

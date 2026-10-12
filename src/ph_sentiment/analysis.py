@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import re
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
@@ -35,10 +36,25 @@ _FILIPINO_STOPWORDS = frozenset(
     "wala walang yan yung iyong po opo naman dahil habang kapag kung saan".split()
 )
 _TOPIC_STOPWORDS = frozenset(ENGLISH_STOP_WORDS) | _FILIPINO_STOPWORDS
+_PUBLISHER_TEMPLATE = re.compile(
+    r"🤖\s*ia:\s*it['’]s\s+not\s+clickbait\s*✅\s*"
+    r"👥\s*users:\s*it['’]s\s+not\s+clickbait\s*✅",
+    re.IGNORECASE,
+)
+_TOPIC_FEATURE_NOTE = (
+    " Topic/proximity features omit stopwords, emoji-only tokens, and the exact "
+    "repeated IA/Users clickbait publisher template; document and sentiment text are preserved."
+)
 
 
 def _topic_tokens(text: str) -> list[str]:
-    return [word for word in tokenize(text) if word not in _TOPIC_STOPWORDS]
+    """Keep content features while removing a specific repeated publisher footer."""
+    content = _PUBLISHER_TEMPLATE.sub(" ", text)
+    return [
+        word
+        for word in tokenize(content)
+        if word not in _TOPIC_STOPWORDS and any(character.isalnum() for character in word)
+    ]
 
 
 def _validate_inputs(
@@ -226,7 +242,8 @@ def analyze(
                 "topic_id": topic_id,
                 "value": coherence,
                 "evaluation_scope": "in_sample_document_presence",
-                "notes": "Unseen pairs=-1; universal pairs=0; all top-term pairs are averaged.",
+                "notes": "Unseen pairs=-1; universal pairs=0; all top-term pairs are averaged."
+                + _TOPIC_FEATURE_NOTE,
             }
         )
     unique_terms = set(int(index) for topic in selected_terms for index in topic)
@@ -245,7 +262,7 @@ def analyze(
                 "topic_id": "",
                 "value": value,
                 "evaluation_scope": "in_sample",
-                "notes": note,
+                "notes": note + _TOPIC_FEATURE_NOTE,
             }
         )
 

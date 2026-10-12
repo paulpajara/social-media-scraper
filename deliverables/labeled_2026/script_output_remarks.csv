@@ -1,0 +1,7 @@
+﻿script,output,remarks
+Public Bluesky/Mastodon collectors,raw/*.csv,Original frozen public API sample; manifests record actual query/date coverage.
+scripts/fetch_annotation_context.py,labels/post_context.csv,"Public Bluesky embed text only; no linked websites, media files or author profiles."
+Independent AI annotation + curation.curate_records,labels/annotation_decisions.csv; processed/posts.csv,"Full-text relevance/target-polarity decisions, reasons and text hashes; unresolved rows excluded."
+analysis.analyze,analysis/*.csv,Three LDA topics; fixed rule sentiment; cosine/Jaccard/Euclidean pairs; topic diagnostics.
+evaluation.evaluate(label_source='ai_assisted'),evaluation/*.csv,"90/10 holdout and ten development folds; agreement against AI references, not human-validated accuracy."
+notebooks/philippine_government_2026.ipynb,data/labeled-notebook-run/*.csv (subdirectories),Offline Run All; supplied labels; group completes documentation and interpretation.

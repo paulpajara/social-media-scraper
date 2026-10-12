@@ -269,7 +269,7 @@ def export_handoff(run_dir: Path, output_dir: Path, config_path: Path) -> Path:
         _write_guide(staging, len(raw), len(prepared), source_summary)
         _write_dictionary(staging)
         _write_script_table(staging)
-        _write_integrity_manifest(staging)
+        write_integrity_manifest(staging)
         staging.rename(output_dir)
     return output_dir
 
@@ -371,10 +371,11 @@ def _write_script_table(output: Path) -> None:
     write_csv(output / "script_output_remarks.csv", rows, ("script", "output", "remarks"))
 
 
-def _write_integrity_manifest(output: Path) -> None:
+def write_integrity_manifest(output: Path) -> None:
+    """Write row counts and byte checksums for every other snapshot file."""
     rows = []
     for path in sorted(output.rglob("*")):
-        if path.is_file():
+        if path.is_file() and path != output / "file_manifest.csv":
             row_count = len(_table(path)[1]) if path.suffix == ".csv" else ""
             payload = path.read_bytes()
             rows.append(
@@ -386,3 +387,29 @@ def _write_integrity_manifest(output: Path) -> None:
                 }
             )
     write_csv(output / "file_manifest.csv", rows, ("path", "rows", "bytes", "sha256"))
+
+
+def verify_integrity_manifest(snapshot: Path) -> None:
+    """Require a complete, safe manifest whose hashes and row counts match disk."""
+    snapshot = snapshot.resolve()
+    _, entries = _table(snapshot / "file_manifest.csv", ("path", "rows", "bytes", "sha256"))
+    filenames = [entry["path"] for entry in entries]
+    actual = {
+        path.relative_to(snapshot).as_posix()
+        for path in snapshot.rglob("*")
+        if path.is_file() and path != snapshot / "file_manifest.csv"
+    }
+    if len(filenames) != len(set(filenames)) or set(filenames) != actual:
+        raise DataValidationError("Snapshot integrity manifest is incomplete or duplicated.")
+    for entry in entries:
+        relative = Path(entry["path"])
+        path = (snapshot / relative).resolve()
+        if relative.is_absolute() or not path.is_relative_to(snapshot) or not path.is_file():
+            raise DataValidationError("Unsafe or missing snapshot manifest file.")
+        payload = path.read_bytes()
+        if entry["sha256"] != hashlib.sha256(payload).hexdigest() or entry["bytes"] != str(
+            len(payload)
+        ):
+            raise DataValidationError(f"Snapshot checksum mismatch: {entry['path']}.")
+        if path.suffix == ".csv" and entry["rows"] != str(len(_table(path)[1])):
+            raise DataValidationError(f"Snapshot CSV row count mismatch: {entry['path']}.")

@@ -78,7 +78,7 @@ def prepare_records(
             and any(label and label != record.gold_label for label in previous_labels)
         ):
             raise DataValidationError(
-                "Duplicate records have conflicting human labels; adjudicate them."
+                "Duplicate records have conflicting reference labels; adjudicate them."
             )
         if not reason and identity in identities:
             reason = "duplicate_record_id"
@@ -86,7 +86,7 @@ def prepare_records(
             previous_label = texts[text_identity]
             if previous_label and record.gold_label and previous_label != record.gold_label:
                 raise DataValidationError(
-                    "Duplicate texts have conflicting human labels; adjudicate them."
+                    "Duplicate texts have conflicting reference labels; adjudicate them."
                 )
             reason = "duplicate_text"
         if not reason:

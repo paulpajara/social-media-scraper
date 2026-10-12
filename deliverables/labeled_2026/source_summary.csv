@@ -1,0 +1,3 @@
+﻿platform,raw_records,prepared_candidates,curated_records,negative,neutral,positive,first_post_date_manila,last_post_date_manila,label_source
+bluesky,289,261,182,82,86,14,2026-08-06,2026-10-12,ai_assisted
+mastodon,75,74,49,22,24,3,2026-02-04,2026-10-12,ai_assisted
