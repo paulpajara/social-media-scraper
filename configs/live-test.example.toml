@@ -30,5 +30,5 @@ max_pages = 1
 
 [mastodon]
 hashtags = ["Philippines", "Marcos"]
-government_terms = ["gobyerno", "pamahalaan", "government", "administration", "president", "marcos", "bbm", "duterte"]
-country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy", "gobyerno", "pamahalaan", "bbm"]
+government_terms = ["gobyerno", "pamahalaan", "government", "administration", "philippine president", "president marcos", "marcos", "duterte", "malacanang"]
+country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy"]

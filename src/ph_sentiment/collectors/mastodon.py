@@ -101,6 +101,17 @@ class MastodonCollector(Collector):
             )
         self.government_pattern = self._term_pattern("government_terms")
         self.country_pattern = self._term_pattern("country_terms")
+        government_terms = {
+            " ".join(term.split()).casefold() for term in self.settings["government_terms"]
+        }
+        country_terms = {
+            " ".join(term.split()).casefold() for term in self.settings["country_terms"]
+        }
+        if government_terms.intersection(country_terms):
+            raise ConfigurationError(
+                "Mastodon country_terms must provide separate country evidence; "
+                "do not reuse government_terms such as BBM or gobyerno as country markers."
+            )
 
     def _term_pattern(self, name: str) -> re.Pattern[str]:
         terms = self.settings.get(name)

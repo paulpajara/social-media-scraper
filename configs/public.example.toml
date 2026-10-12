@@ -25,5 +25,7 @@ max_pages = 1
 [mastodon]
 # Fixed public instance: mastodon.social. Hashtag results cover only its visible network.
 hashtags = ["Philippines", "Marcos", "PhilippinePolitics", "BBM", "PHPolitics", "Gobyerno"]
-government_terms = ["gobyerno", "pamahalaan", "government", "administration", "president", "marcos", "bbm", "duterte"]
-country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy", "gobyerno", "pamahalaan", "bbm"]
+# A corporate/university "president" or ambiguous BBM tag alone is not government evidence.
+government_terms = ["gobyerno", "pamahalaan", "government", "administration", "philippine president", "president marcos", "marcos", "duterte", "malacanang"]
+# Country markers must be independent of government keywords and Filipino-language words.
+country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy"]
