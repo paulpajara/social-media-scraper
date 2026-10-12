@@ -11,8 +11,6 @@ import requests
 
 from ph_sentiment.collectors import make_collector
 from ph_sentiment.collectors.base import HTTPClient, date_bounds
-from ph_sentiment.collectors.facebook import FacebookCollector
-from ph_sentiment.collectors.reddit import RedditCollector
 from ph_sentiment.collectors.threads import ThreadsCollector
 from ph_sentiment.collectors.x import XCollector
 from ph_sentiment.errors import CollectionError, ConfigurationError
@@ -78,30 +76,10 @@ def config() -> dict[str, Any]:
 @pytest.fixture(autouse=True)
 def credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
-        "REDDIT_CLIENT_ID",
-        "REDDIT_CLIENT_SECRET",
-        "REDDIT_USER_AGENT",
         "X_BEARER_TOKEN",
         "THREADS_ACCESS_TOKEN",
-        "FACEBOOK_ACCESS_TOKEN",
     ):
         monkeypatch.setenv(name, "test-credential")
-
-
-def reddit_listing(items: list[dict[str, Any]], after: str | None = None) -> dict[str, Any]:
-    return {"data": {"children": items, "after": after}}
-
-
-def reddit_post(identifier: str, created: str, text: str = "government") -> dict[str, Any]:
-    return {
-        "kind": "t3",
-        "data": {
-            "id": identifier,
-            "title": text,
-            "selftext": "",
-            "created_utc": datetime.fromisoformat(created).timestamp(),
-        },
-    }
 
 
 def test_manila_calendar_dates_are_converted_to_utc() -> None:
@@ -160,6 +138,9 @@ def test_long_retry_after_is_not_shortened() -> None:
         "https://user:secret@api.x.com/",
         "https://api.x.com:444/",
         "https://api.x.com/#fragment",
+        "https://www.reddit.com/api/v1/access_token",
+        "https://oauth.reddit.com/search",
+        "https://graph.facebook.com/v25.0/123/posts",
     ],
 )
 def test_http_rejects_unsafe_urls_before_network(url: str) -> None:
@@ -173,7 +154,7 @@ def test_http_rejects_unsafe_urls_before_network(url: str) -> None:
 def test_http_never_includes_upstream_secrets_in_errors(status: int) -> None:
     client, session = mocked_client(FakeResponse({"error": "secret-token-and-request-url"}, status))
     with pytest.raises(CollectionError) as captured:
-        client.request_json("GET", "https://graph.facebook.com/v25.0/123/posts")
+        client.request_json("GET", "https://graph.threads.net/v1.0/keyword_search")
     assert "secret-token" not in str(captured.value)
     assert len(session.calls) == 1
 
@@ -245,69 +226,6 @@ def test_http_partial_response_option_requires_boolean(value: Any) -> None:
             "GET", "https://api.x.com/2/tweets/search/recent", allow_partial_errors=value
         )
     assert session.calls == []
-
-
-def test_reddit_oauth_pagination_deduplication_and_date_filter(config: dict[str, Any]) -> None:
-    config["queries"] = ["government", "Marcos"]
-    config["settings"] = {"subreddits": ["Philippines"]}
-    at_start = reddit_post("abc", "2025-12-31T16:00:00+00:00", "Government &amp; services")
-    before_start = reddit_post("old", "2025-12-31T15:59:59+00:00")
-    at_end = reddit_post("late", "2026-12-31T16:00:00+00:00")
-    client, session = mocked_client(
-        {"access_token": "oauth-token", "expires_in": 3600},
-        reddit_listing([before_start, at_start, at_end], "t3_abc"),
-        reddit_listing([reddit_post("def", "2026-01-02T00:00:00+00:00")]),
-        reddit_listing([at_start]),
-    )
-    collector = RedditCollector(config, client)
-    rows = collector.collect()
-    assert [row.record_id for row in rows] == ["reddit:t3_abc", "reddit:t3_def"]
-    assert rows[0].text == "Government & services"
-    assert rows[0].created_at == "2025-12-31T16:00:00Z"
-    assert session.calls[0][0:2] == ("POST", "https://www.reddit.com/api/v1/access_token")
-    assert session.calls[0][2]["data"] == {"grant_type": "client_credentials"}
-    assert session.calls[0][2]["auth"] == ("test-credential", "test-credential")
-    assert session.calls[2][2]["params"]["after"] == "t3_abc"
-    assert session.calls[1][2]["headers"]["Authorization"] == "Bearer oauth-token"
-
-
-def test_reddit_comments_expand_omitted_children(config: dict[str, Any]) -> None:
-    config["include_comments"] = True
-    comment = {
-        "kind": "t1",
-        "data": {
-            "id": "c1",
-            "body": "Better services please",
-            "created_utc": 1767312000,
-            "replies": "",
-        },
-    }
-    more = {"kind": "more", "data": {"children": ["c2", "c2"]}}
-    comment2 = {"kind": "t1", "data": {"id": "c2", "body": "Improving", "created_utc": 1767312000}}
-    client, session = mocked_client(
-        {"access_token": "oauth-token", "expires_in": 3600},
-        reddit_listing([reddit_post("abc", "2026-01-02T00:00:00+00:00")]),
-        [reddit_listing([]), reddit_listing([comment, more])],
-        {"json": {"errors": [], "data": {"things": [comment2]}}},
-    )
-    rows = RedditCollector(config, client).collect()
-    assert [row.record_type for row in rows] == ["post", "comment", "comment"]
-    assert session.calls[-1][1] == "https://oauth.reddit.com/api/morechildren"
-    assert session.calls[-1][2]["params"]["children"] == "c2"
-    assert session.calls[-1][2]["params"]["link_id"] == "t3_abc"
-
-
-def test_reddit_token_is_renewed_after_expiration(config: dict[str, Any]) -> None:
-    client, session = mocked_client(
-        {"access_token": "first", "expires_in": 31}, {"access_token": "second", "expires_in": 3600}
-    )
-    now = [0.0]
-    client.clock = lambda: now[0]
-    collector = RedditCollector(config, client)
-    assert collector._headers()["Authorization"] == "Bearer first"
-    now[0] = 2
-    assert collector._headers()["Authorization"] == "Bearer second"
-    assert len(session.calls) == 2
 
 
 def test_x_archive_pagination_date_window_and_minimum_page_size(config: dict[str, Any]) -> None:
@@ -434,57 +352,6 @@ def test_graph_stops_repeated_cursors_and_reports_budget(config: dict[str, Any])
     assert any("max_pages" in warning for warning in collector.warnings)
 
 
-def test_facebook_literal_page_post_filter_and_comments(config: dict[str, Any]) -> None:
-    config["settings"] = {"page_ids": ["123"], "graph_version": "v25.0"}
-    config["include_comments"] = True
-    client, session = mocked_client(
-        {
-            "data": [
-                {
-                    "id": "123_1",
-                    "message": "GOVERNMENT services",
-                    "created_time": "2026-04-01T12:00:00+0000",
-                },
-                {
-                    "id": "123_2",
-                    "message": "Unrelated topic",
-                    "created_time": "2026-04-01T12:00:00+0000",
-                },
-            ]
-        },
-        {
-            "data": [
-                {
-                    "id": "123_3",
-                    "message": "Improve them please",
-                    "created_time": "2026-04-02T12:00:00+0000",
-                },
-                {
-                    "id": "123_4",
-                    "message": "Wrong date",
-                    "created_time": "2026-12-31T16:00:00+0000",
-                },
-            ]
-        },
-    )
-    collector = FacebookCollector(config, client)
-    rows = collector.collect()
-    assert [row.record_id for row in rows] == ["facebook:123_1", "facebook:123_3"]
-    assert [row.record_type for row in rows] == ["post", "comment"]
-    assert session.calls[0][1] == "https://graph.facebook.com/v25.0/123/posts"
-    assert session.calls[1][1] == "https://graph.facebook.com/v25.0/123_1/comments"
-    assert all("from" not in call[2]["params"]["fields"] for call in session.calls)
-    assert any("not unrestricted" in warning for warning in collector.warnings)
-
-
-def test_facebook_requires_explicit_version_and_authorized_page_ids(config: dict[str, Any]) -> None:
-    with pytest.raises(ConfigurationError, match="graph_version"):
-        FacebookCollector(config)
-    config["settings"] = {"graph_version": "v25.0", "page_ids": ["../../me"]}
-    with pytest.raises(ConfigurationError, match="page_ids"):
-        FacebookCollector(config)
-
-
 def test_record_budget_is_global_across_queries(config: dict[str, Any]) -> None:
     config["max_records"] = 1
     config["queries"] = ["government", "services"]
@@ -520,9 +387,10 @@ def test_unsupported_comment_collection_is_explicit(
         collector_type(config)
 
 
-def test_factory_rejects_unsupported_platform(config: dict[str, Any]) -> None:
+@pytest.mark.parametrize("platform", ["unknown", "reddit", "facebook"])
+def test_factory_rejects_unsupported_platform(config: dict[str, Any], platform: str) -> None:
     with pytest.raises(ConfigurationError, match="supported collector"):
-        make_collector("unknown", config)
+        make_collector(platform, config)
 
 
 @pytest.mark.parametrize(
@@ -582,20 +450,6 @@ def test_threads_provenance_url_removes_query_tokens(config: dict[str, Any]) -> 
     )
     rows = ThreadsCollector(config, client).collect()
     assert rows[0].source_url == "https://www.threads.com/@example/post/abc"
-
-
-def test_reddit_comment_budget_reports_incomplete_tree(config: dict[str, Any]) -> None:
-    config["include_comments"] = True
-    config["max_pages"] = 1
-    client, session = mocked_client(
-        {"access_token": "oauth-token", "expires_in": 3600},
-        reddit_listing([reddit_post("abc", "2026-01-02T00:00:00+00:00")]),
-        [reddit_listing([]), reddit_listing([{"kind": "more", "data": {"children": ["c1"]}}])],
-    )
-    collector = RedditCollector(config, client)
-    assert len(collector.collect()) == 1
-    assert len(session.calls) == 3
-    assert any("comment trees are incomplete" in warning for warning in collector.warnings)
 
 
 @pytest.mark.parametrize(

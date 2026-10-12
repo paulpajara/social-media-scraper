@@ -1,7 +1,9 @@
 import csv
 from pathlib import Path
 
-from ph_sentiment.cli import main
+import pytest
+
+from ph_sentiment.cli import main, parser
 from ph_sentiment.config import DEFAULT_CONFIG
 from ph_sentiment.csvio import read_records, write_records
 from ph_sentiment.schema import Record
@@ -10,7 +12,7 @@ from ph_sentiment.schema import Record
 def sample_records():
     # Synthetic test fixtures only; never presented as observed public opinion.
     return [
-        Record(str(index), "reddit" if index % 2 else "x", "2026-06-01T00:00:00Z", text)
+        Record(str(index), "threads" if index % 2 else "x", "2026-06-01T00:00:00Z", text)
         for index, text in enumerate(
             [
                 "good government health hospitals affordable medicine",
@@ -100,7 +102,7 @@ def test_evaluation_cli_reserves_holdout_at_activity_scale(tmp_path: Path):
     records = [
         Record(
             f"{label}-{index}",
-            "reddit" if index % 2 else "x",
+            "threads" if index % 2 else "x",
             "2026-06-01T00:00:00Z",
             f"Government policy {cue} testexample{index}",
             gold_label=label,
@@ -136,13 +138,31 @@ def test_collect_cli_writes_manifest_and_closes_client(tmp_path: Path, monkeypat
 
     collector = FakeCollector()
     monkeypatch.setattr(collectors, "make_collector", lambda platform, config: collector)
-    output = tmp_path / "reddit.csv"
-    assert main(["collect", "--platform", "reddit", "--output", str(output)]) == 0
+    output = tmp_path / "threads.csv"
+    assert main(["collect", "--platform", "threads", "--output", str(output)]) == 0
     assert collector.closed
     assert len(read_records(output)) == 9
-    with (tmp_path / "reddit_collection_manifest.csv").open(
+    with (tmp_path / "threads_collection_manifest.csv").open(
         encoding="utf-8-sig", newline=""
     ) as stream:
         manifest = list(csv.DictReader(stream))
     assert manifest[0]["collected_records"] == "9"
     assert manifest[0]["warnings"] == collector.warnings[0]
+
+
+@pytest.mark.parametrize("command", ["collect", "collect-live"])
+@pytest.mark.parametrize("platform", ["threads", "x", "bluesky", "mastodon"])
+def test_collection_cli_accepts_the_four_main_platforms(command: str, platform: str):
+    arguments = [command, "--platform", platform]
+    if command == "collect":
+        arguments += ["--output", "source.csv"]
+    selected = parser().parse_args(arguments)
+    assert selected.platform == (platform if command == "collect" else [platform])
+
+
+@pytest.mark.parametrize("command", ["collect", "collect-live", "collect-public"])
+@pytest.mark.parametrize("platform", ["reddit", "facebook"])
+def test_collection_cli_rejects_removed_platforms(command: str, platform: str):
+    with pytest.raises(SystemExit) as captured:
+        parser().parse_args([command, "--platform", platform])
+    assert captured.value.code == 2

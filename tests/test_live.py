@@ -16,10 +16,8 @@ from ph_sentiment.errors import CollectionError, DataValidationError
 from ph_sentiment.schema import Record
 
 _CREDENTIALS = {
-    "reddit": ("REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USER_AGENT"),
     "x": ("X_BEARER_TOKEN",),
     "threads": ("THREADS_ACCESS_TOKEN",),
-    "facebook": ("FACEBOOK_ACCESS_TOKEN",),
 }
 
 
@@ -104,7 +102,9 @@ def test_missing_credentials_produce_report_without_network(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
     calls = install_collectors(monkeypatch, {})
-    result = live.live_collect(config, tmp_path / "run", progress=lambda _: None)
+    result = live.live_collect(
+        config, tmp_path / "run", platforms=list(_CREDENTIALS), progress=lambda _: None
+    )
     assert calls == []
     assert result.record_count == 0
     assert result.prepared_path is None
@@ -119,33 +119,33 @@ def test_missing_credentials_produce_report_without_network(
 def test_source_failure_preserves_successful_source_and_closes_clients(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
-    enable(monkeypatch, "reddit", "x")
-    successful = FakeCollector(records("reddit", 2))
+    enable(monkeypatch, "threads", "x")
+    successful = FakeCollector(records("threads", 2))
     failed = FakeCollector([], CollectionError("API returned HTTP 403; check read permissions."))
-    calls = install_collectors(monkeypatch, {"reddit": successful, "x": failed})
+    calls = install_collectors(monkeypatch, {"threads": successful, "x": failed})
     result = live.live_collect(
-        config, tmp_path / "run", platforms=["reddit", "x"], progress=lambda _: None
+        config, tmp_path / "run", platforms=["threads", "x"], progress=lambda _: None
     )
-    assert [platform for platform, _ in calls] == ["reddit", "x"]
+    assert [platform for platform, _ in calls] == ["threads", "x"]
     assert successful.closed and failed.closed
     assert result.record_count == 2
     assert result.prepared_path is not None
-    assert {row.platform for row in read_records(result.prepared_path)} == {"reddit"}
+    assert {row.platform for row in read_records(result.prepared_path)} == {"threads"}
     statuses = {row["platform"]: row["status"] for row in csv_rows(result.report_path)}
     assert statuses["x"] == "failed"
-    assert statuses["reddit"] == "success"
+    assert statuses["threads"] == "success"
 
 
 def test_below_activity_minimum_writes_deduplication_audit_and_blank_labels(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
-    enable(monkeypatch, "reddit")
-    unique = records("reddit", 2)
-    duplicate = replace(unique[0], record_id="reddit:repost", text=unique[0].text.upper())
+    enable(monkeypatch, "threads")
+    unique = records("threads", 2)
+    duplicate = replace(unique[0], record_id="threads:repost", text=unique[0].text.upper())
     collector = FakeCollector([*unique, duplicate])
-    install_collectors(monkeypatch, {"reddit": collector})
+    install_collectors(monkeypatch, {"threads": collector})
     output = tmp_path / "run"
-    result = live.live_collect(config, output, platforms=["reddit"], progress=lambda _: None)
+    result = live.live_collect(config, output, platforms=["threads"], progress=lambda _: None)
     assert result.record_count == 2
     assert result.analysis_paths == {}
     assert result.prepared_path is not None
@@ -168,10 +168,10 @@ def test_activity_scale_forwards_analysis_options(
 ) -> None:
     from ph_sentiment import analysis
 
-    enable(monkeypatch, "reddit", "x")
+    enable(monkeypatch, "threads", "x")
     install_collectors(
         monkeypatch,
-        {"reddit": FakeCollector(records("reddit", 100)), "x": FakeCollector(records("x", 100))},
+        {"threads": FakeCollector(records("threads", 100)), "x": FakeCollector(records("x", 100))},
     )
     analysis_calls: list[tuple[list[Record], Path, dict[str, Any]]] = []
 
@@ -184,7 +184,7 @@ def test_activity_scale_forwards_analysis_options(
     if hasattr(live, "analyze"):
         monkeypatch.setattr(live, "analyze", analyze)
     result = live.live_collect(
-        config, tmp_path / "run", platforms=["reddit", "x"], progress=lambda _: None
+        config, tmp_path / "run", platforms=["threads", "x"], progress=lambda _: None
     )
     assert result.record_count == 200
     assert len(analysis_calls) == 1
@@ -200,15 +200,15 @@ def test_activity_scale_forwards_analysis_options(
 def test_existing_run_is_protected_before_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
-    enable(monkeypatch, "reddit")
-    collector = FakeCollector(records("reddit"))
-    calls = install_collectors(monkeypatch, {"reddit": collector})
+    enable(monkeypatch, "threads")
+    collector = FakeCollector(records("threads"))
+    calls = install_collectors(monkeypatch, {"threads": collector})
     output = tmp_path / "run"
     output.mkdir()
     protected = write_csv(output / "existing.csv", [{"preserve": "human-label"}], ["preserve"])
     before = protected.read_bytes()
     with pytest.raises(DataValidationError, match="overwrite"):
-        live.live_collect(config, output, platforms=["reddit"], progress=lambda _: None)
+        live.live_collect(config, output, platforms=["threads"], progress=lambda _: None)
     assert calls == []
     assert protected.read_bytes() == before
 
@@ -216,12 +216,12 @@ def test_existing_run_is_protected_before_collection(
 def test_skip_analysis_keeps_large_dataset_available(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
-    enable(monkeypatch, "reddit")
-    install_collectors(monkeypatch, {"reddit": FakeCollector(records("reddit", 200))})
+    enable(monkeypatch, "threads")
+    install_collectors(monkeypatch, {"threads": FakeCollector(records("threads", 200))})
     result = live.live_collect(
         config,
         tmp_path / "run",
-        platforms=["reddit"],
+        platforms=["threads"],
         skip_analysis=True,
         progress=lambda _: None,
     )
@@ -234,11 +234,11 @@ def test_skip_analysis_keeps_large_dataset_available(
 def test_partial_collection_checkpoint_preserves_records_and_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
-    enable(monkeypatch, "reddit")
-    collector = FakeCollector(records("reddit", 2), CollectionError("API quota exceeded."))
-    install_collectors(monkeypatch, {"reddit": collector})
+    enable(monkeypatch, "threads")
+    collector = FakeCollector(records("threads", 2), CollectionError("API quota exceeded."))
+    install_collectors(monkeypatch, {"threads": collector})
     result = live.live_collect(
-        config, tmp_path / "run", platforms=["reddit"], progress=lambda _: None
+        config, tmp_path / "run", platforms=["threads"], progress=lambda _: None
     )
     assert collector.closed
     assert result.record_count == 2
@@ -266,32 +266,60 @@ def test_successful_empty_collection_is_saved_without_fabricated_rows(
     assert read_records(result.raw_paths[0]) == []
 
 
-def test_multisource_comment_support_and_platform_queries_are_preserved(
+def test_default_live_run_uses_only_the_four_main_platforms(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
     enable(monkeypatch, *_CREDENTIALS)
     config["research"]["include_comments"] = True
     platform_queries = ["government policy lang:en", "gobyerno lang:tl"]
     config["x"]["queries"] = platform_queries
-    configured = {platform: FakeCollector(records(platform)) for platform in _CREDENTIALS}
+    platforms = ("threads", "x", "bluesky", "mastodon")
+    configured = {platform: FakeCollector(records(platform)) for platform in platforms}
     calls = install_collectors(monkeypatch, configured)
     result = live.live_collect(config, tmp_path / "run", progress=lambda _: None)
 
     supplied = dict(calls)
-    assert {platform: options["include_comments"] for platform, options in calls} == {
-        "reddit": True,
-        "x": False,
-        "threads": False,
-        "facebook": True,
-    }
+    assert tuple(supplied) == platforms
+    assert all(options["include_comments"] is False for _, options in calls)
     assert supplied["x"]["queries"] == platform_queries
-    assert supplied["reddit"]["queries"] == config["research"]["queries"]
+    assert supplied["threads"]["queries"] == config["research"]["queries"]
     assert result.record_count == 4
     assert all(collector.closed for collector in configured.values())
     for raw_path in result.raw_paths:
         platform = raw_path.stem
         manifest = raw_path.with_name(f"{platform}_collection_manifest.csv")
         row = csv_rows(manifest)[0]
-        expected_queries = platform_queries if platform == "x" else config["research"]["queries"]
+        expected_queries = config.get(platform, {}).get("queries", config["research"]["queries"])
         assert row["platform"] == platform
         assert row["queries"] == " | ".join(expected_queries)
+
+
+@pytest.mark.parametrize("platforms", [[], ["reddit"], ["facebook"], ["x", "reddit"]])
+def test_removed_sources_are_rejected_before_collection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any], platforms: list[str]
+) -> None:
+    calls = install_collectors(monkeypatch, {})
+    with pytest.raises(DataValidationError, match="supported source"):
+        live.live_collect(config, tmp_path / "run", platforms=platforms, progress=lambda _: None)
+    assert calls == []
+    assert not (tmp_path / "run").exists()
+
+
+def test_default_live_run_preserves_public_results_without_authenticated_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
+) -> None:
+    configured = {
+        platform: FakeCollector(records(platform)) for platform in ("bluesky", "mastodon")
+    }
+    calls = install_collectors(monkeypatch, configured)
+    result = live.live_collect(config, tmp_path / "run", progress=lambda _: None)
+    assert [platform for platform, _ in calls] == ["bluesky", "mastodon"]
+    assert result.record_count == 2
+    assert {row["platform"]: row["status"] for row in result.statuses} == {
+        "threads": "missing_credentials",
+        "x": "missing_credentials",
+        "bluesky": "success",
+        "mastodon": "success",
+    }
+    assert result.prepared_path is not None
+    assert {record.platform for record in read_records(result.prepared_path)} == set(configured)
