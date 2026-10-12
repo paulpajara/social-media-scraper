@@ -2,7 +2,6 @@
 
 A Python command-line pipeline and notebook for collecting public social-media discussions, preparing a reproducible corpus, extracting at least three topics, comparing posts, and evaluating a rule-based English/Filipino/Taglish sentiment baseline. Every dataset, audit, prediction, and metric export is **CSV**. No fabricated observations or political conclusions are included.
 
-The implementation follows the supplied midterm activity's computational requirements. The documentation PDF and peer-evaluation form are outside this code-focused phase. Rename a submission copy of the notebook to your actual `GROUP NAME.ipynb`.
 
 ## Install (PowerShell, Python 3.11+)
 
@@ -59,7 +58,7 @@ Current interfaces are based on the official [Reddit API reference](https://www.
 ./.venv/Scripts/python.exe -m ph_sentiment collect --platform facebook --config configs/research.toml --output data/raw/facebook.csv
 ```
 
-The example intentionally leaves Facebook Page IDs/version empty. Fill them with values approved for your application. For X recent search, use a window within the last seven days and `search_mode = "recent"`; do not expect it to retrieve earlier 2026 records. Existing outputs are protected; `--overwrite` explicitly permits replacement.
+The example intentionally leaves Facebook Page IDs/version empty. For X recent search, use a window within the last seven days and `search_mode = "recent"`; might not retrieve records >2026. Existing outputs are protected; `--overwrite` explicitly permits replacement.
 
 ## Import existing public exports
 
@@ -97,7 +96,7 @@ Account usernames/IDs are deliberately omitted. Public source URLs remain as res
 
 Preparation normalizes text, removes URLs/mentions/markup, preserves negation and hashtag words, filters the date window, and removes empty/deleted/duplicate records. The audit explains every retained or dropped record. Cross-platform duplicates are detected using normalized token sequences. Raw CSVs are retained so cleaning decisions can be inspected. Each input CSV must have a valid schema; malformed rows fail instead of being silently discarded.
 
-Analysis and evaluation require **200 valid unique records by default**. Collection may need substantially more raw records to reach that net count. The CLI reports single-platform sampling so you can address the activity's different-source requirement. `--minimum-records 3` is an explicit exploratory/smoke override and does not satisfy the final activity requirements. Human labels must include all three classes, with at least ten examples per class remaining in development for ten-fold validation. Do not manufacture records or change valid labels to meet these constraints.
+Analysis and evaluation require **200 valid unique records by default**. Collection may need substantially more raw records to reach that net count. `--minimum-records 3` is an explicit exploratory/smoke override. Human labels must include all three classes, with at least ten examples per class remaining in development for ten-fold validation.
 
 | Output | Purpose |
 | --- | --- |
