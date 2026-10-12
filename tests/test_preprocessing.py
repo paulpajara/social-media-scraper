@@ -38,7 +38,7 @@ def test_conflicting_duplicate_labels_need_adjudication():
         Record(str(index), "reddit", "2026-06-01T00:00:00Z", "same text", gold_label=label)
         for index, label in enumerate(["positive", "negative"])
     ]
-    with pytest.raises(DataValidationError, match="conflicting human labels"):
+    with pytest.raises(DataValidationError, match="conflicting reference labels"):
         prepare_records(rows)
 
 
@@ -52,5 +52,5 @@ def test_conflicting_same_id_labels_rejected():
         Record("same-id", "reddit", "2026-06-01T00:00:00Z", "same text", gold_label=label)
         for label in ["positive", "negative"]
     ]
-    with pytest.raises(DataValidationError, match="conflicting human labels"):
+    with pytest.raises(DataValidationError, match="conflicting reference labels"):
         prepare_records(records)

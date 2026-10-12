@@ -108,7 +108,8 @@ def test_default_activity_minimum_and_input_protection(tmp_path: Path):
     assert len(read_records(raw)) == 9
 
 
-def test_evaluation_cli_reserves_holdout_at_activity_scale(tmp_path: Path):
+@pytest.mark.parametrize("label_source", ["human", "ai_assisted"])
+def test_evaluation_cli_reserves_holdout_at_activity_scale(tmp_path: Path, label_source: str):
     # Independently specified synthetic software labels; these are not public observations.
     cues = {"positive": "good", "negative": "bad", "neutral": "information"}
     records = [
@@ -125,7 +126,10 @@ def test_evaluation_cli_reserves_holdout_at_activity_scale(tmp_path: Path):
     source = tmp_path / "human_fixture.csv"
     write_records(source, records)
     output = tmp_path / "evaluation"
-    assert main(["evaluate", "--input", str(source), "--output-dir", str(output)]) == 0
+    arguments = ["evaluate", "--input", str(source), "--output-dir", str(output)]
+    if label_source == "ai_assisted":
+        arguments += ["--label-source", label_source]
+    assert main(arguments) == 0
     with (output / "split_assignments.csv").open(encoding="utf-8-sig", newline="") as stream:
         assignments = list(csv.DictReader(stream))
     assert len(assignments) == 210
@@ -133,6 +137,25 @@ def test_evaluation_cli_reserves_holdout_at_activity_scale(tmp_path: Path):
     assert {row["validation_fold"] for row in assignments if row["split"] == "development"} == {
         str(index) for index in range(1, 11)
     }
+    assert {row["label_source"] for row in assignments} == {label_source}
+    if label_source == "ai_assisted":
+        assert all("not human-validated accuracy" in row["notes"] for row in assignments)
+
+
+def test_evaluation_cli_rejects_unknown_label_provenance():
+    with pytest.raises(SystemExit) as captured:
+        parser().parse_args(
+            [
+                "evaluate",
+                "--input",
+                "labels.csv",
+                "--output-dir",
+                "evaluation",
+                "--label-source",
+                "model_predictions",
+            ]
+        )
+    assert captured.value.code == 2
 
 
 def test_collect_cli_writes_manifest_and_closes_client(tmp_path: Path, monkeypatch):

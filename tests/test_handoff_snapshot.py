@@ -58,8 +58,17 @@ def test_committed_notebook_is_clean_and_defaults_to_offline_handoff():
     code_cells = [cell for cell in notebook.cells if cell.cell_type == "code"]
     assert all(cell.execution_count is None and not cell.outputs for cell in code_cells)
     sources = "\n".join(cell.source for cell in code_cells)
-    assert '"deliverables" / "public_2026"' in sources
-    assert "RUN_EVALUATION = False" in sources
+    assert '"deliverables" / "labeled_2026"' in sources
+    assert '"labeled-notebook-run"' in sources
+    assert "RUN_EVALUATION = True" in sources
+    assert 'LABEL_SOURCE = "ai_assisted"' in sources
+    assert '"--label-source"' in sources
+    assert "shutil.copy2(PREPARED_SOURCE, PROCESSED)" in sources
+    assert "shutil.copy2(ANNOTATION_SOURCE, ANNOTATIONS)" in sources
+    assert 'run_cli("prepare"' not in sources
+    assert "stage_fingerprint" in sources and "cached_stage" in sources
+    assert "require_supplied=True" in sources
+    assert "actual_paths" in sources
     assert '"collect-live"' not in sources and '"collect-public"' not in sources
     assert "sha256" in sources
     for cell in code_cells:

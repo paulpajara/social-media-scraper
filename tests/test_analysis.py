@@ -2,15 +2,17 @@
 
 import csv
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 from scipy.sparse import csr_matrix
 
-from ph_sentiment.analysis import _npmi_coherence, _sample_pairs, analyze
+from ph_sentiment.analysis import _npmi_coherence, _sample_pairs, _topic_tokens, analyze
 from ph_sentiment.errors import ConfigurationError, DataValidationError
 from ph_sentiment.schema import Record
+from ph_sentiment.sentiment import SentimentClassifier
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -134,3 +136,48 @@ def test_analysis_rejects_insufficient_or_empty_vocabulary(
 def test_record_identity_includes_platform(corpus: list[Record], tmp_path: Path) -> None:
     corpus.append(Record("0", "x", "2026-01-01T00:00:00Z", "Transparent fair tax services"))
     assert len(read_rows(analyze(corpus, tmp_path)["documents"])) == 7
+
+
+@pytest.mark.parametrize("apostrophe", ["'", "’"])
+def test_topic_features_remove_exact_publisher_template_and_keep_content(apostrophe: str) -> None:
+    template = (
+        f"🤖 IA: It{apostrophe}s not clickbait ✅\n👥 USERS: It{apostrophe}s not clickbait ✅"
+    )
+    content = "Philippine government clickbait claims on 2026-10-12 budget 500 health policy"
+    assert _topic_tokens(content + " " + template + " 👇👇👇") == _topic_tokens(content)
+    assert "clickbait" in _topic_tokens(content)
+    assert "2026" in _topic_tokens(content)
+    assert "500" in _topic_tokens(content)
+    assert "government" in _topic_tokens(content)
+    assert _topic_tokens("😊 ✅ 👥 👇 🤖 !!! ...") == []
+
+
+def test_partial_publisher_phrase_is_retained_as_content() -> None:
+    # Do not globally blacklist these words or remove ordinary discussion.
+    assert "clickbait" in _topic_tokens("Users say it is clickbait government reporting")
+    assert "clickbait" in _topic_tokens("🤖 IA: It's not clickbait ✅")
+
+
+def test_topic_filter_preserves_canonical_and_sentiment_text(
+    corpus: list[Record], tmp_path: Path
+) -> None:
+    template = " 🤖 IA: It's not clickbait ✅ 👥 Users: It's not clickbait ✅ 👇👇👇 😊"
+    decorated = [replace(record, text=record.text + template) for record in corpus]
+    base_paths = analyze(corpus, tmp_path / "base", max_pairs=100)
+    decorated_paths = analyze(decorated, tmp_path / "decorated", max_pairs=100)
+    # Footer differences cannot become LDA or proximity features.
+    for output in ("topic_terms", "topic_metrics", "proximity_pairs"):
+        assert base_paths[output].read_bytes() == decorated_paths[output].read_bytes()
+    documents = read_rows(decorated_paths["documents"])
+    classifier = SentimentClassifier()
+    for record, document in zip(decorated, documents, strict=True):
+        assert document["text"] == record.text
+        assert "😊" in document["clean_text"]
+        assert "clickbait" in document["clean_text"]
+        prediction = classifier.predict(record.text)
+        assert document["sentiment_label"] == prediction.label
+        assert float(document["sentiment_score"]) == prediction.score
+    assert all(
+        "document and sentiment text are preserved" in row["notes"]
+        for row in read_rows(decorated_paths["topic_metrics"])
+    )
