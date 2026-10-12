@@ -69,7 +69,7 @@ def config() -> dict[str, Any]:
         "max_records": 10,
         "max_pages": 3,
         "include_comments": False,
-        "settings": {},
+        "settings": {"check_token": False},
     }
 
 
@@ -245,7 +245,7 @@ def test_x_archive_pagination_date_window_and_minimum_page_size(config: dict[str
     assert [row.record_id for row in rows] == ["x:101", "x:103"]
     assert session.calls[0][1] == "https://api.x.com/2/tweets/search/all"
     assert session.calls[0][2]["params"]["max_results"] == 10
-    assert session.calls[0][2]["params"]["tweet.fields"] == "created_at,note_tweet"
+    assert session.calls[0][2]["params"]["post.fields"] == "created_at,note_post"
     assert session.calls[1][2]["params"]["next_token"] == "next"
 
 
@@ -288,7 +288,7 @@ def test_x_recent_uses_documented_endpoint(config: dict[str, Any]) -> None:
 
 
 def test_threads_paging_reconstructs_cursor_without_returned_token(config: dict[str, Any]) -> None:
-    config["settings"] = {"search_type": "RECENT", "search_mode": "TAG"}
+    config["settings"] = {"search_type": "RECENT", "search_mode": "TAG", "check_token": False}
     client, session = mocked_client(
         {
             "data": [
