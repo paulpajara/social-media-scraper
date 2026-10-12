@@ -23,7 +23,15 @@ from ph_sentiment.preprocessing import date_window
 from ph_sentiment.schema import Record, parse_timestamp
 
 API_HOSTS = frozenset(
-    {"www.reddit.com", "oauth.reddit.com", "api.x.com", "graph.threads.net", "graph.facebook.com"}
+    {
+        "www.reddit.com",
+        "oauth.reddit.com",
+        "api.x.com",
+        "graph.threads.net",
+        "graph.facebook.com",
+        "api.bsky.app",
+        "mastodon.social",
+    }
 )
 
 

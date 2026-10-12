@@ -7,7 +7,9 @@ from urllib.parse import urlsplit
 
 from .errors import DataValidationError
 
-PLATFORMS = frozenset({"reddit", "x", "threads", "facebook", "news", "blog", "other"})
+PLATFORMS = frozenset(
+    {"reddit", "x", "threads", "facebook", "bluesky", "mastodon", "news", "blog", "other"}
+)
 LABELS = ("negative", "neutral", "positive")
 
 

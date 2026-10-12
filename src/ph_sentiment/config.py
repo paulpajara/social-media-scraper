@@ -7,6 +7,7 @@ from .errors import ConfigurationError
 from .preprocessing import date_window
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "research.example.toml"
+PUBLIC_CONFIG = DEFAULT_CONFIG.with_name("public.example.toml")
 
 
 def load_config(path: Path | str = DEFAULT_CONFIG) -> dict:

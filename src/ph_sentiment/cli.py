@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .config import DEFAULT_CONFIG, load_config
+from .config import DEFAULT_CONFIG, PUBLIC_CONFIG, load_config
 from .csvio import read_records, write_csv, write_records
 from .errors import DataValidationError, PipelineError
 from .preprocessing import AUDIT_FIELDS, prepare_records
@@ -23,19 +23,28 @@ def parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("collect", "Collect through an official, credentialed social-media API"),
         ("collect-live", "Collect available live sources, prepare CSVs, and analyze when ready"),
+        ("collect-public", "Run credential-free Bluesky/Mastodon collection and CSV analysis"),
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
         ("analyze", "Compute topics, rule-based sentiment, and proximity measures"),
         ("label", "Create a blank human annotation CSV without model predictions"),
         ("evaluate", "Evaluate human labels with 90/10 split and 10-fold validation"),
     ):
         command = subparsers.add_parser(name, help=help_text)
-        command.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+        command.add_argument(
+            "--config",
+            type=Path,
+            default=PUBLIC_CONFIG if name == "collect-public" else DEFAULT_CONFIG,
+        )
         command.add_argument(
             "--overwrite", action="store_true", help="Explicitly replace existing outputs"
         )
-        if name == "collect-live":
+        if name in {"collect-live", "collect-public"}:
             command.add_argument(
-                "--platform", choices=("reddit", "x", "threads", "facebook"), action="append"
+                "--platform",
+                choices=("bluesky", "mastodon")
+                if name == "collect-public"
+                else ("reddit", "x", "threads", "facebook", "bluesky", "mastodon"),
+                action="append",
             )
             command.add_argument(
                 "--output-dir", type=Path, help="Defaults to a new timestamped data/live directory"
@@ -45,7 +54,9 @@ def parser() -> argparse.ArgumentParser:
             )
         elif name == "collect":
             command.add_argument(
-                "--platform", choices=("reddit", "x", "threads", "facebook"), required=True
+                "--platform",
+                choices=("reddit", "x", "threads", "facebook", "bluesky", "mastodon"),
+                required=True,
             )
             command.add_argument("--output", type=Path, required=True)
         else:
@@ -125,16 +136,16 @@ def _prepared_input(path: Path, config: dict, minimum: int) -> list[Record]:
 def run(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     research = config["research"]
-    if args.command == "collect-live":
-        from .live import live_collect
+    if args.command in {"collect-live", "collect-public"}:
+        from .live import PUBLIC_PLATFORMS, live_collect
 
-        output_dir = args.output_dir or Path("data/live") / datetime.now(UTC).strftime(
-            "%Y%m%dT%H%M%S%fZ"
-        )
+        output_dir = args.output_dir or Path(
+            "data/public" if args.command == "collect-public" else "data/live"
+        ) / datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
         result = live_collect(
             config,
             output_dir,
-            args.platform,
+            args.platform or (PUBLIC_PLATFORMS if args.command == "collect-public" else None),
             args.overwrite,
             args.skip_analysis,
             progress=lambda message: print(message, flush=True),

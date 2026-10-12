@@ -17,6 +17,8 @@ PLATFORM_CREDENTIALS = {
     "threads": ("THREADS_ACCESS_TOKEN",),
     "facebook": ("FACEBOOK_ACCESS_TOKEN",),
 }
+PUBLIC_PLATFORMS = ("bluesky", "mastodon")
+SUPPORTED_PLATFORMS = (*PLATFORM_CREDENTIALS, *PUBLIC_PLATFORMS)
 REPORT_FIELDS = ("platform", "status", "record_count", "output_path", "message", "warnings")
 MANIFEST_FIELDS = (
     "platform",
@@ -65,6 +67,8 @@ def collector_config(platform: str, config: dict) -> dict:
     )
     if "queries" in settings:
         options["queries"] = settings["queries"]
+    if "max_pages" in settings:
+        options["max_pages"] = settings["max_pages"]
     return options
 
 
@@ -129,8 +133,8 @@ def live_collect(
 ) -> LiveResult:
     """Attempt selected sources independently; readiness is not proof of API permission."""
     selected = list(dict.fromkeys(platforms if platforms is not None else PLATFORM_CREDENTIALS))
-    if not selected or any(platform not in PLATFORM_CREDENTIALS for platform in selected):
-        raise DataValidationError("Select reddit, x, threads, or facebook for live collection.")
+    if not selected or any(platform not in SUPPORTED_PLATFORMS for platform in selected):
+        raise DataValidationError(f"Choose a supported source: {', '.join(SUPPORTED_PLATFORMS)}.")
     output_dir = Path(output_dir)
     if output_dir.exists() and not output_dir.is_dir():
         raise DataValidationError("Live output path must be a directory.")
@@ -152,7 +156,9 @@ def live_collect(
             "warnings": "",
         }
         missing = [
-            name for name in PLATFORM_CREDENTIALS[platform] if not os.environ.get(name, "").strip()
+            name
+            for name in PLATFORM_CREDENTIALS.get(platform, ())
+            if not os.environ.get(name, "").strip()
         ]
         if missing:
             row.update(status="missing_credentials", message="Set locally: " + ", ".join(missing))
