@@ -7,7 +7,7 @@ The attached *Midterm Activity 1* is used as an assignment reference. The curren
 ## Study scope and collection
 
 1. Define an inclusive search vocabulary in `configs/research.example.toml`: administration names and verified aliases, institutions, and relevant policy areas. Include English, Filipino, and Taglish expressions. Keep the query wording and collection dates with the research notes. Avoid selecting only approving or only critical terms.
-2. Use public data accessible through supported official APIs, or import a legitimately obtained CSV into the same schema. Reddit, X, Threads, and Facebook have different access, search, and historical coverage limits. The available results depend on credentials, API permissions, endpoint capabilities, and collection time.
+2. Use public data accessible through supported official APIs, or import a legitimately obtained CSV into the same schema. The active platforms are **Threads, X, Bluesky, and Mastodon**. Their access, search, and historical coverage limits differ; available results depend on credentials, API permissions, endpoint capabilities, instance visibility, and collection time.
 3. Collect at least **200 final cleaned records from different sources** for the activity. A pilot with fewer records is useful for debugging but does not satisfy that requirement. Count distinct retained records after cleaning, not downloaded rows. Inspect the actual platform distribution; requesting several platforms does not guarantee that each returned usable data.
 4. Use the interval beginning `2026-01-01` and ending before `2027-01-01`, with timestamps normalized consistently. Data collected before the end of 2026 covers only the elapsed portion of that year. Do not describe it as a full-year sample.
 5. Keep all tabular datasets in `.csv` files. Keep raw, prepared, annotated, analyzed, and evaluation datasets separate so each transformation is traceable.
@@ -16,19 +16,21 @@ Use a sampling log to record collection time, search vocabulary, requested platf
 
 ## One-command live workflow
 
-The credential-free alternative is `python -m ph_sentiment collect-public`, using `configs/public.example.toml`. It collects **Bluesky and Mastodon**, then performs the same CSV preparation and analysis stages. These platform names remain in the dataset and summaries; their posts must not be described as observations from Reddit, X, Threads, or Facebook. Public search/hashtag visibility limits, query relevance, reporting versus opinion, and language coverage still require review. Compare source counts before interpreting cross-platform results.
+The credential-free subset is `python -m ph_sentiment collect-public`, using `configs/public.example.toml`. It collects **Bluesky and Mastodon**, then performs the same CSV preparation and analysis stages. It does not attempt X or Threads. Public search/hashtag visibility limits, query relevance, reporting versus opinion, and language coverage still require review. Compare actual source counts before interpreting cross-platform results.
 
-For the recommended automated workflow, copy `.env.example` to a local `.env`, fill the credentials for the sources you can access, and run:
+For the recommended automated workflow, create a local `.env` from `.env.example` if one does not already exist, set `X_BEARER_TOKEN` and `THREADS_ACCESS_TOKEN` for the sources you can access, and run:
 
 ```console
 python -m ph_sentiment collect-live --config configs/research.example.toml
 ```
 
-The command attempts Reddit, X, Threads, and Facebook independently. Blank credentials are reported as `missing_credentials`; they do not produce invented records. Results go to a new timestamped folder under `data/live` by default. Each run writes `collection_report.csv` and `run_summary.csv`; successful or partial sources write `raw/<platform>.csv` and a collection manifest. When records were returned, preparation writes `processed/posts.csv` and `processed/preprocessing_audit.csv`. Analysis runs automatically once the configured retained-record minimum is met (200 by default).
+The command attempts **Threads, X, Bluesky, and Mastodon independently**. X and Threads require tokens; Bluesky and Mastodon use public endpoints without credentials. Blank required credentials are reported as `missing_credentials`; they do not produce invented records. Results go to a new timestamped folder under `data/live` by default. Each run writes `collection_report.csv` and `run_summary.csv`; successful or partial sources write `raw/<platform>.csv` and a collection manifest. When records were returned, preparation writes `processed/posts.csv` and `processed/preprocessing_audit.csv`. Analysis runs automatically once the configured retained-record minimum is met (200 by default).
 
-Repeat `--platform` to select sources, use `--skip-analysis` to collect and prepare only, or provide `--output-dir` for a specific run folder. Existing CSV outputs require explicit `--overwrite`; a fresh folder preserves earlier runs. Inspect partial-source warnings, retained counts, actual source coverage, and analysis status before interpreting the outputs. Credentials and API permissions are still required for live observations; no live data is included merely by configuring placeholders.
+Repeat `--platform` to select sources, use `--skip-analysis` to collect and prepare only, or provide `--output-dir` for a specific run folder. Existing CSV outputs require explicit `--overwrite`; a fresh folder preserves earlier runs. Inspect partial-source warnings, retained counts, actual source coverage, and analysis status before interpreting the outputs. Source failures are recorded separately, so a successful multi-source run can still have unavailable platforms. Report their zero counts explicitly. Tokens and placeholders do not establish public coverage.
 
-The notebook's separate stages remain available for manual imports and review. To inspect an automated run there, point its data paths to the selected live run's `raw`, `processed`, and `analysis` folders.
+The X research preset requests archive access for the 2026 window. If this access is unavailable, a source failure is recorded rather than silently replacing the requested period with recent search. A recent-search pilot needs an explicitly chosen date window within the last seven days. A Threads token requires approved `threads_keyword_search` permission for public keyword coverage; without approval, results can be limited to the authorized account. Mastodon hashtag timelines reflect content visible to the selected instance. Review these different coverage limits when comparing sources.
+
+The notebook's separate stages remain available for manual imports and review. Set its `LIVE_RUN_DIR` to an automated run's directory to reuse that run's `raw`, `processed`, and `analysis` folders. Keep optional collection disabled when inspecting an existing run.
 
 ## Data preparation and quality checks
 
@@ -53,7 +55,7 @@ Inspect `topic_terms.csv` together with representative records in `analyzed_docu
 
 `topic_metrics.csv` includes document-presence NPMI coherence, topic diversity, and explicitly **in-sample** LDA perplexity. Coherence measures term co-occurrence, diversity measures overlap among top terms, and in-sample perplexity describes fit to the supplied corpus. None proves that the topics are socially meaningful or will generalize. Human inspection is required. A small or homogeneous corpus may not support three distinct interpretable topics.
 
-Keep record types separate when interpreting public sentiment. Facebook Page posts can be institutional communications, while comments may reflect public reactions. `sentiment_summary.csv` groups by `record_type` as well as topic, platform, and Manila-local month; document who produced the selected content before describing it as public opinion.
+Keep record types and publication purposes separate when interpreting public sentiment. Institutional posts, news reports, and personal opinions express different kinds of content. `sentiment_summary.csv` groups by `record_type` as well as topic, platform, and Manila-local month; document the type of selected content before describing it as public opinion.
 
 For exploratory topic changes, record the settings and regenerate outputs. Freeze the choices before interpreting final results. Topic modeling is descriptive and separate from the human-labeled sentiment evaluation.
 
