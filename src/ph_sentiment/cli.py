@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from .config import DEFAULT_CONFIG, PUBLIC_CONFIG, load_config
 from .csvio import read_records, write_csv, write_records
 from .errors import DataValidationError, PipelineError
+from .live import PUBLIC_PLATFORMS, SUPPORTED_PLATFORMS
 from .preprocessing import AUDIT_FIELDS, prepare_records
 from .schema import Record
 
@@ -21,7 +22,7 @@ def parser() -> argparse.ArgumentParser:
     )
     subparsers = root.add_subparsers(dest="command", required=True)
     for name, help_text in (
-        ("collect", "Collect through an official, credentialed social-media API"),
+        ("collect", "Collect one Threads, X, Bluesky, or Mastodon source through its API"),
         ("collect-live", "Collect available live sources, prepare CSVs, and analyze when ready"),
         ("collect-public", "Run credential-free Bluesky/Mastodon collection and CSV analysis"),
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
@@ -41,9 +42,7 @@ def parser() -> argparse.ArgumentParser:
         if name in {"collect-live", "collect-public"}:
             command.add_argument(
                 "--platform",
-                choices=("bluesky", "mastodon")
-                if name == "collect-public"
-                else ("reddit", "x", "threads", "facebook", "bluesky", "mastodon"),
+                choices=PUBLIC_PLATFORMS if name == "collect-public" else SUPPORTED_PLATFORMS,
                 action="append",
             )
             command.add_argument(
@@ -55,7 +54,7 @@ def parser() -> argparse.ArgumentParser:
         elif name == "collect":
             command.add_argument(
                 "--platform",
-                choices=("reddit", "x", "threads", "facebook", "bluesky", "mastodon"),
+                choices=SUPPORTED_PLATFORMS,
                 required=True,
             )
             command.add_argument("--output", type=Path, required=True)
@@ -137,7 +136,7 @@ def run(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     research = config["research"]
     if args.command in {"collect-live", "collect-public"}:
-        from .live import PUBLIC_PLATFORMS, live_collect
+        from .live import live_collect
 
         output_dir = args.output_dir or Path(
             "data/public" if args.command == "collect-public" else "data/live"

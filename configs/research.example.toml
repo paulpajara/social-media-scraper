@@ -6,12 +6,7 @@ end_date = "2027-01-01"
 max_records = 1000
 max_pages = 20
 include_comments = false
-queries = [
-  'Philippine government',
-  'Philippine administration',
-  'gobyerno',
-  'pamahalaan',
-]
+queries = ['Philippine government', 'Philippine administration', 'gobyerno', 'pamahalaan']
 
 [analysis]
 minimum_records = 200
@@ -21,9 +16,6 @@ max_features = 5000
 top_terms = 10
 max_pairs = 5000
 
-[reddit]
-subreddits = ["Philippines", "phinvest"]
-
 [x]
 # Recent search covers only seven days. Archive needs the appropriate API entitlement.
 search_mode = "archive"
@@ -32,8 +24,13 @@ search_mode = "archive"
 search_type = "RECENT"
 search_mode = "KEYWORD"
 
-[facebook]
-# Supply authorized public Page IDs and a Graph API version supported by your app.
-# No general Facebook keyword or personal-profile scraping is implemented.
-page_ids = []
-graph_version = ""
+[bluesky]
+# Verified public first pages; this deployment denied cursor pagination.
+max_pages = 1
+queries = ["Philippines Marcos", "Philippine government", "gobyerno", "pamahalaan"]
+
+[mastodon]
+max_pages = 4
+hashtags = ["Philippines", "Marcos", "PhilippinePolitics", "BBM", "PHPolitics", "Gobyerno"]
+government_terms = ["gobyerno", "pamahalaan", "government", "administration", "president", "marcos", "bbm", "duterte"]
+country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy", "gobyerno", "pamahalaan", "bbm"]

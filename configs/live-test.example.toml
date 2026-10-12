@@ -1,0 +1,34 @@
+# Bounded live checks for the four selected sources. Tokens stay in .env.
+# X is limited to one request with at most ten returned posts; normal API charges may apply.
+[research]
+start_date = "2026-01-01"
+end_date = "2027-01-01"
+max_records = 20
+max_pages = 1
+include_comments = false
+queries = ["Philippine government"]
+
+[analysis]
+minimum_records = 200
+n_topics = 3
+seed = 42
+max_features = 5000
+top_terms = 10
+max_pairs = 5000
+
+[threads]
+search_type = "RECENT"
+search_mode = "KEYWORD"
+
+[x]
+search_mode = "archive"
+max_records = 10
+
+[bluesky]
+queries = ["Philippines Marcos"]
+max_pages = 1
+
+[mastodon]
+hashtags = ["Philippines", "Marcos"]
+government_terms = ["gobyerno", "pamahalaan", "government", "administration", "president", "marcos", "bbm", "duterte"]
+country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy", "gobyerno", "pamahalaan", "bbm"]

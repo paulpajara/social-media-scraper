@@ -12,14 +12,21 @@ from .preprocessing import AUDIT_FIELDS, prepare_records
 from .schema import Record
 
 PLATFORM_CREDENTIALS = {
-    "reddit": ("REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USER_AGENT"),
-    "x": ("X_BEARER_TOKEN",),
     "threads": ("THREADS_ACCESS_TOKEN",),
-    "facebook": ("FACEBOOK_ACCESS_TOKEN",),
+    "x": ("X_BEARER_TOKEN",),
 }
 PUBLIC_PLATFORMS = ("bluesky", "mastodon")
 SUPPORTED_PLATFORMS = (*PLATFORM_CREDENTIALS, *PUBLIC_PLATFORMS)
-REPORT_FIELDS = ("platform", "status", "record_count", "output_path", "message", "warnings")
+REPORT_FIELDS = (
+    "platform",
+    "status",
+    "record_count",
+    "output_path",
+    "message",
+    "warnings",
+    "http_status",
+    "error_category",
+)
 MANIFEST_FIELDS = (
     "platform",
     "collected_at",
@@ -59,16 +66,15 @@ def collector_config(platform: str, config: dict) -> dict:
     research = config["research"]
     settings = config.get(platform, {})
     options = {**research, "settings": settings}
-    # Comment-tree collection is supported by two sources. Global settings can
-    # therefore be shared by a multi-source run without breaking X/Threads.
-    options["include_comments"] = settings.get(
-        "include_comments",
-        research.get("include_comments", False) if platform in {"reddit", "facebook"} else False,
-    )
+    # All active collectors read search/timeline posts; conversation expansion
+    # must be explicitly implemented before requesting it from a source.
+    options["include_comments"] = settings.get("include_comments", False)
     if "queries" in settings:
         options["queries"] = settings["queries"]
     if "max_pages" in settings:
         options["max_pages"] = settings["max_pages"]
+    if "max_records" in settings:
+        options["max_records"] = settings["max_records"]
     return options
 
 
@@ -132,7 +138,7 @@ def live_collect(
     progress: Callable[[str], None] = print,
 ) -> LiveResult:
     """Attempt selected sources independently; readiness is not proof of API permission."""
-    selected = list(dict.fromkeys(platforms if platforms is not None else PLATFORM_CREDENTIALS))
+    selected = list(dict.fromkeys(platforms if platforms is not None else SUPPORTED_PLATFORMS))
     if not selected or any(platform not in SUPPORTED_PLATFORMS for platform in selected):
         raise DataValidationError(f"Choose a supported source: {', '.join(SUPPORTED_PLATFORMS)}.")
     output_dir = Path(output_dir)
@@ -154,6 +160,8 @@ def live_collect(
             "output_path": "",
             "message": "",
             "warnings": "",
+            "http_status": "",
+            "error_category": "",
         }
         missing = [
             name
@@ -169,7 +177,12 @@ def live_collect(
             try:
                 result = collect_to_csv(platform, config, raw_path)
             except PipelineError as exc:
-                row.update(status="failed", message=str(exc))
+                row.update(
+                    status="failed",
+                    message=str(exc),
+                    http_status=getattr(exc, "status_code", ""),
+                    error_category=getattr(exc, "category", ""),
+                )
                 progress(f"{platform}: {exc}")
             else:
                 all_records.extend(result.records)
