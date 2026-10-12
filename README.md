@@ -50,7 +50,7 @@ The two credential placeholders in `.env.example` are for **X and Threads**. Bla
 ./.venv/Scripts/python.exe -m ph_sentiment collect-live --platform x --platform threads --config configs/research.toml
 ```
 
-Each run creates a new timestamped directory in `data/live/`, containing per-source raw CSVs and manifests, `collection_report.csv`, `run_summary.csv`, `processed/posts.csv`, a preprocessing audit, and analysis CSVs when the configured minimum is met (200 by default). Use `--output-dir` to choose a directory or `--skip-analysis` to collect/prepare only. Explicit platform selection and automatic source selection use the same real API collectors.
+Each run creates a new timestamped directory in `data/live/`, containing per-source raw CSVs and manifests, `collection_report.csv`, `run_summary.csv`, `processed/posts.csv`, a preprocessing audit, and analysis CSVs when the configured minimum is met (200 by default). Threads and X also save `*_query_diagnostics.csv` with API-returned and locally retained counts per query. Use `--output-dir` to choose a directory or `--skip-analysis` to collect/prepare only. Explicit platform selection and automatic source selection use the same real API collectors.
 
 Missing credentials, empty search results, successful collection, and incomplete collection have distinct statuses. Every completed source is saved immediately. A later API failure retains already received records and marks that source `partial`; other selected sources continue. A run with no valid collected records exits with an actionable error and CSV readiness/status reports. No placeholder rows are added to public datasets. The active sources collect search or hashtag results, so keep `research.include_comments = false`.
 
@@ -62,7 +62,28 @@ For a bounded live verification, use the test preset below. It attempts all four
 ./.venv/Scripts/python.exe -m ph_sentiment collect-live --config configs/live-test.example.toml --skip-analysis
 ```
 
-`collection_report.csv` includes `http_status` and `error_category` for failed HTTP access checks. HTTP 402 is reported as `payment_required`; check the source's API credits/billing. Threads HTTP 200 with zero records is an empty search result, not proof of public-search approval or neutral public sentiment. Threads requests clamp the exclusive end timestamp to the current moment, as its API requires. Only aggregate counts and safe diagnostic messages are logged; upstream error bodies and token values are not logged.
+`collection_report.csv` includes `http_status` and `error_category` for failed HTTP requests. Recognized X HTTP 402 credit failures report `credits_depleted`; other payment failures report `payment_required`. Query diagnostics distinguish `empty_api` (the API supplied no posts), `filtered_empty` (returned posts were rejected locally), and failed or partial queries. Threads HTTP 200 with zero records does not prove public-search approval or neutral public sentiment. Threads requests clamp the exclusive end timestamp to the current moment, as its API requires. Only counts, allowlisted metadata, and safe diagnostic messages are logged; upstream error bodies and token values are not logged.
+
+Single-source `collect` exits with code 2 when no records are retained and preserves the empty CSV and query diagnostics. Use a new output directory for each research run; timestamped directories are the default. When using `--overwrite`, rely on the current source report rather than treating older files remaining in the directory as newly collected observations.
+
+### Check tokens and account readiness
+
+Run this before collection to inspect Threads token validity, required scopes, and expiry, and read X's API credit balance:
+
+```powershell
+./.venv/Scripts/python.exe -m ph_sentiment check-access --output data/live/access.csv
+
+# Select either source, or repeat --platform to select both.
+./.venv/Scripts/python.exe -m ph_sentiment check-access --platform threads --platform x --output data/live/access.csv --overwrite
+```
+
+This command calls the read-only [Threads token debugger](https://developers.facebook.com/documentation/threads/troubleshooting/debug-access-token) and [X credit-balance endpoint](https://docs.x.com/x-api/usage/get-usage-credits). It makes no post-search requests and does not purchase credits. The CSV records scope flags, expiry in UTC, and the credit balance in USD without exporting tokens or account identities. Existing output requires `--overwrite`. The command exits with code 2 when a selected check is blocked, unverified, or missing credentials; a successful metadata check does not establish public-search approval or endpoint entitlement.
+
+Threads collection checks token metadata by default and stops before search when the token is invalid, expired, or known to lack `threads_basic` or `threads_keyword_search`. It warns near expiry. If the debugger is unavailable, collection continues with an explicit warning that permissions remain unverified. Set `check_token = false` in `[threads]` only when token validity and scopes have already been checked externally; this does not change Meta's public-access requirements.
+
+If Threads still returns `empty_api`, confirm that your app's **public `threads_keyword_search` access has passed App Review** in Meta's app dashboard. Token scopes alone do not establish that approval: [Meta's keyword-search documentation](https://developers.facebook.com/docs/threads/keyword-search/) describes restricted results for apps without approval. Authorize both required scopes and regenerate the token after changing permissions. For an expiring token, follow Meta's [long-lived token instructions](https://developers.facebook.com/docs/threads/get-started/long-lived-tokens/), then replace `THREADS_ACCESS_TOKEN` locally and rerun `check-access`.
+
+For X `credits_depleted`, check Billing/Credits in the [X Developer Console](https://console.x.com/) and restore the account's credit balance before retrying. Both recent and archive search require available access; changing the date window cannot repair depleted credits. Review current [X pricing](https://docs.x.com/x-api/getting-started/pricing) and spending limits before funding the account. The program cannot restore credits automatically, and a positive balance does not guarantee every endpoint is authorized.
 
 | Source | Implemented collection | Required configuration / access |
 | --- | --- | --- |
@@ -75,7 +96,7 @@ These APIs have different search semantics, quotas, and visibility limits. A val
 
 Every collector filters publication timestamps locally, deduplicates record IDs, respects bounded pagination, and records API-specific limitations in a collection manifest. Missing permission, quota, or authentication produces a source error; the other selected platforms continue. Count actual retained records by platform rather than assuming that a four-platform request yielded four-platform observations. An unavailable or empty source is not neutral sentiment.
 
-Current interfaces are based on the official [X search documentation](https://docs.x.com/x-api/posts/search/introduction), [Threads keyword-search documentation](https://developers.facebook.com/docs/threads/keyword-search/), [Bluesky search schema](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/searchPosts.json), and [Mastodon public timelines](https://docs.joinmastodon.org/methods/timelines/). Live access depends on your application's permissions and current endpoint availability; each run's status reports describe the access actually observed.
+Current interfaces are based on the official [X search documentation](https://docs.x.com/x-api/posts/search/introduction), [Threads keyword-search documentation](https://developers.facebook.com/docs/threads/keyword-search/), [Bluesky search schema](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/searchPosts.json), and [Mastodon public timelines](https://docs.joinmastodon.org/methods/timelines/). X search defaults to `post.fields`, matching the current [official OpenAPI schema](https://docs.x.com/openapi.json); `[x] fields_parameter = "tweet.fields"` remains available for legacy integrations. Live access depends on your application's permissions and current endpoint availability; each run's status reports describe the access actually observed.
 
 ```powershell
 # Run one or more authorized sources. Each also writes a separate manifest CSV.
