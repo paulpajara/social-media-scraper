@@ -1,0 +1,10 @@
+﻿platform,review_status,records,share,reviewer_type,human_confirmation
+bluesky,clearly_relevant,136,0.5210727969348659,AI_assisted_provisional,pending
+bluesky,clearly_irrelevant,59,0.2260536398467433,AI_assisted_provisional,pending
+bluesky,uncertain/context_needed,66,0.25287356321839083,AI_assisted_provisional,pending
+mastodon,clearly_relevant,48,0.6486486486486487,AI_assisted_provisional,pending
+mastodon,clearly_irrelevant,23,0.3108108108108108,AI_assisted_provisional,pending
+mastodon,uncertain/context_needed,3,0.04054054054054054,AI_assisted_provisional,pending
+all,clearly_relevant,184,0.5492537313432836,AI_assisted_provisional,pending
+all,clearly_irrelevant,82,0.24477611940298508,AI_assisted_provisional,pending
+all,uncertain/context_needed,69,0.20597014925373133,AI_assisted_provisional,pending

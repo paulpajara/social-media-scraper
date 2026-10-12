@@ -1,0 +1,4 @@
+﻿topic_id,npmi_all_documents,npmi_without_longest_document,removed_record_id,removed_document_topic,scope,removed_document_all_tokens,removed_document_feature_tokens,share_of_assigned_topic_feature_tokens
+0,0.061929878480411024,0.0618089997664124,mastodon:mastodon.social:117400708552987108,1,Original top terms held fixed; no LDA refit; descriptive sensitivity only.,2022,1240,0.0
+1,0.4973501290999843,-0.6824292746908922,mastodon:mastodon.social:117400708552987108,1,Original top terms held fixed; no LDA refit; descriptive sensitivity only.,2022,1240,0.4993958920660491
+2,0.1852019489109906,0.18521500943971209,mastodon:mastodon.social:117400708552987108,1,Original top terms held fixed; no LDA refit; descriptive sensitivity only.,2022,1240,0.0

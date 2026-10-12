@@ -10,7 +10,9 @@ import pytest
 
 from ph_sentiment.collectors.bluesky import SEARCH_ENDPOINT, BlueskyCollector
 from ph_sentiment.collectors.mastodon import INSTANCE, MastodonCollector, plain_text
+from ph_sentiment.config import PUBLIC_CONFIG, load_config
 from ph_sentiment.errors import CollectionError, ConfigurationError
+from ph_sentiment.live import collector_config
 
 DID = "did:plc:abcdefghijklmnopqrstuvwx"
 
@@ -203,6 +205,44 @@ def test_mastodon_deduplicates_across_hashtags_and_bounds_global_records(
     client = PublicClient([mastodon_post(), mastodon_post("200")])
     assert len(MastodonCollector(config, client).collect()) == 1
     assert len(client.calls) == 1
+
+
+@pytest.mark.parametrize("shared", ["bbm", " BBM ", "gobyerno", "  Government  "])
+def test_mastodon_rejects_shared_country_and_government_evidence(config, shared):
+    config["settings"]["government_terms"].extend(["bbm", "government"])
+    config["settings"]["country_terms"].append(shared)
+    client = PublicClient()
+    with pytest.raises(ConfigurationError, match="separate country evidence"):
+        MastodonCollector(config, client)
+    assert client.calls == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "BBM entertainment and sports news #BBM",
+        "Filipino adult entertainment and sports tags #BBM",
+        "The gobyerno of Canada announced a budget #Gobyerno",
+        "A university president discusses global AI education in the Philippines.",
+    ],
+)
+def test_public_preset_excludes_acronym_foreign_and_corporate_president_collisions(text):
+    config = collector_config("mastodon", load_config(PUBLIC_CONFIG))
+    collector = MastodonCollector(config, PublicClient())
+    collector._add_status(mastodon_post(content=f"<p>{text}</p>"), "Philippines")
+    assert collector.records == []
+
+
+def test_public_preset_keeps_explicit_philippine_governance_context():
+    config = collector_config("mastodon", load_config(PUBLIC_CONFIG))
+    collector = MastodonCollector(config, PublicClient())
+    collector._add_status(
+        mastodon_post(
+            content="<p>President Marcos discusses government services in the Philippines.</p>"
+        ),
+        "Philippines",
+    )
+    assert len(collector.records) == 1
 
 
 def test_mastodon_malformed_items_and_publication_window(config: dict[str, Any]) -> None:

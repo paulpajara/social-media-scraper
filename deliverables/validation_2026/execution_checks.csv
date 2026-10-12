@@ -1,0 +1,9 @@
+﻿check,status,observed,remarks
+notebook_execution,pass,8,All code cells completed; external network access blocked.
+prepared_records,pass,335,Canonical records equal committed snapshot.
+human_labels,pending,0,Independent human annotation required; no accuracy reported.
+analyzed_documents.csv,pass,335,Byte-for-byte identical to supplied baseline CSV.
+proximity_pairs.csv,pass,5000,Byte-for-byte identical to supplied baseline CSV.
+sentiment_summary.csv,pass,102,Byte-for-byte identical to supplied baseline CSV.
+topic_metrics.csv,pass,9,Byte-for-byte identical to supplied baseline CSV.
+topic_terms.csv,pass,30,Byte-for-byte identical to supplied baseline CSV.

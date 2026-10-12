@@ -1,0 +1,10 @@
+﻿check,status,observed,requirement_or_reference,remarks
+provisional_government_relevance,needs_review,184,At least 200 government-relevant final observations from different sources,82 off-target and 69 context-dependent flags; assisted review requires human confirmation.
+independent_human_labels,pending,0,Independent positive/negative/neutral gold labels,"Accuracy, holdout and ten-fold evaluation cannot be claimed before annotation."
+rule_neutral_without_cues,caution,297,Human-confirmed target stance,All 297 neutral predictions are no-cue defaults. Do not interpret 88.7% as neutral government opinion.
+rule_positive_predictions,descriptive_only,22,22 predictions; not verified endorsement,Rule polarity can refer to another target or quoted news.
+rule_negative_predictions,descriptive_only,16,16 predictions; not verified disapproval,Measure errors against independently annotated target stance.
+topic_1_single_document_dominance,needs_review,49.9% of retained feature tokens,An interpretable governmental topic,One off-target article has 2022 total tokens and 1240 retained model-feature tokens; inspect fixed-term coherence sensitivity.
+time_coverage_september_october,caution,252,335,75.2% of posts are from September–October; not uniform full-year coverage.
+proximity_pair_coverage,pass,5000,55945,"8.94% of possible unordered pairs; seeded bounded sample, not exhaustive comparisons."
+original_snapshot,pass,unchanged,Existing file_manifest.csv checksums,Provisional relevance flags do not delete records or create human sentiment labels.
