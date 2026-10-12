@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -31,6 +32,10 @@ class ThreadsCollector(Collector):
 
     def collect(self) -> list[Record]:
         headers = {"Authorization": f"Bearer {require_env('THREADS_ACCESS_TOKEN')}"}
+        until = min(self.end, datetime.now(UTC))
+        if self.start >= until:
+            self.warn("Threads collection dates begin in the future; no request was sent.")
+            return self.records
         self.warn(
             "Threads public keyword search requires approved threads_keyword_search access. "
             "API ranking, retention and quotas can limit historical coverage."
@@ -44,7 +49,7 @@ class ThreadsCollector(Collector):
                 "fields": "id,text,timestamp,permalink",
                 "limit": 100,
                 "since": int(self.start.timestamp()),
-                "until": int(self.end.timestamp()),
+                "until": int(until.timestamp()),
             }
             if self.search_mode:
                 params["search_mode"] = self.search_mode

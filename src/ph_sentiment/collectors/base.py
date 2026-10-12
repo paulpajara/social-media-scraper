@@ -1,7 +1,7 @@
 """Shared, bounded HTTP transport and collector utilities.
 
-Only documented platform APIs are contacted. Credentials stay in headers or the
-Reddit token POST body; API error bodies and request URLs are never logged.
+Only documented platform APIs are contacted. Credentials stay in headers;
+API error bodies and request URLs are never logged.
 """
 
 from __future__ import annotations
@@ -18,17 +18,19 @@ from urllib.parse import parse_qs, urlsplit
 
 import requests
 
-from ph_sentiment.errors import CollectionError, ConfigurationError, DataValidationError
+from ph_sentiment.errors import (
+    CollectionError,
+    ConfigurationError,
+    DataValidationError,
+    HTTPCollectionError,
+)
 from ph_sentiment.preprocessing import date_window
 from ph_sentiment.schema import Record, parse_timestamp
 
 API_HOSTS = frozenset(
     {
-        "www.reddit.com",
-        "oauth.reddit.com",
         "api.x.com",
         "graph.threads.net",
-        "graph.facebook.com",
         "api.bsky.app",
         "mastodon.social",
     }
@@ -204,13 +206,24 @@ class HTTPClient:
                 continue
             if status in {401, 403}:
                 response.close()
-                raise CollectionError(
-                    f"API returned HTTP {status}; check token validity, app approval and read permissions."
+                raise HTTPCollectionError(
+                    status,
+                    "authentication" if status == 401 else "permission",
+                    f"API returned HTTP {status}; check token validity, app approval and read permissions.",
+                )
+            if status == 402:
+                response.close()
+                raise HTTPCollectionError(
+                    status,
+                    "payment_required",
+                    "API returned HTTP 402 Payment Required; check API credits, billing, and endpoint access.",
                 )
             if not 200 <= status < 300:
                 response.close()
-                raise CollectionError(
-                    f"API returned HTTP {status}; check collection settings and API access."
+                raise HTTPCollectionError(
+                    status,
+                    "http_error",
+                    f"API returned HTTP {status}; check collection settings and API access.",
                 )
             try:
                 payload = response.json()
