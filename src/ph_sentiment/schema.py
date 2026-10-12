@@ -1,4 +1,8 @@
-"""A common public-post schema; deliberately excludes account/user identifiers."""
+"""Common public-post fields without separate profile metadata.
+
+Public post identifiers and provenance URLs can identify authors. These records
+are attributable research data and must not be described as anonymous.
+"""
 
 from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime

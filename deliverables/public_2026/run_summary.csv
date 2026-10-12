@@ -1,0 +1,2 @@
+﻿completed_at,raw_records,prepared_records,sources_with_records,minimum_records,activity_record_minimum_met,analysis_status,analysis_error,posts_path
+2026-10-12T07:37:44.887199+00:00,364,335,2,200,True,success,,processed/posts.csv

@@ -23,8 +23,12 @@ def parser() -> argparse.ArgumentParser:
     subparsers = root.add_subparsers(dest="command", required=True)
     for name, help_text in (
         ("collect", "Collect one Threads, X, Bluesky, or Mastodon source through its API"),
-        ("collect-live", "Collect available live sources, prepare CSVs, and analyze when ready"),
+        (
+            "collect-live",
+            "Collect Bluesky/Mastodon by default, prepare CSVs, and analyze when ready",
+        ),
         ("collect-public", "Run credential-free Bluesky/Mastodon collection and CSV analysis"),
+        ("handoff", "Validate and export a portable Bluesky/Mastodon CSV snapshot for the group"),
         ("check-access", "Check Threads token permissions and X credits without searching posts"),
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
         ("analyze", "Compute topics, rule-based sentiment, and proximity measures"),
@@ -35,12 +39,18 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--config",
             type=Path,
-            default=PUBLIC_CONFIG if name == "collect-public" else DEFAULT_CONFIG,
+            default=PUBLIC_CONFIG
+            if name in {"collect-public", "collect-live", "handoff"}
+            else DEFAULT_CONFIG,
         )
-        command.add_argument(
-            "--overwrite", action="store_true", help="Explicitly replace existing outputs"
-        )
-        if name == "check-access":
+        if name != "handoff":
+            command.add_argument(
+                "--overwrite", action="store_true", help="Explicitly replace existing outputs"
+            )
+        if name == "handoff":
+            command.add_argument("--run-dir", type=Path, required=True)
+            command.add_argument("--output-dir", type=Path, required=True)
+        elif name == "check-access":
             command.add_argument("--platform", choices=("threads", "x"), action="append")
             command.add_argument("--output", type=Path, required=True)
         elif name in {"collect-live", "collect-public"}:
@@ -133,7 +143,10 @@ def _prepared_input(path: Path, config: dict, minimum: int) -> list[Record]:
             "Dataset uses one platform. Add another source for the activity's different-source requirement.",
             file=sys.stderr,
         )
-    return prepared
+    # Preparation here validates that no rows would be dropped. Preserve the
+    # supplied canonical text: decoding entities again can change an already
+    # cleaned corpus and make notebook analysis differ from the live run.
+    return records
 
 
 def run(args: argparse.Namespace) -> None:
@@ -150,7 +163,12 @@ def run(args: argparse.Namespace) -> None:
         return
     config = load_config(args.config)
     research = config["research"]
-    if args.command in {"collect-live", "collect-public"}:
+    if args.command == "handoff":
+        from .handoff import export_handoff
+
+        output = export_handoff(args.run_dir, args.output_dir, args.config)
+        print(f"Validated public-source handoff -> {output}")
+    elif args.command in {"collect-live", "collect-public"}:
         from .live import live_collect
 
         output_dir = args.output_dir or Path(

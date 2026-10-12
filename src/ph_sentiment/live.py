@@ -53,6 +53,17 @@ MANIFEST_FIELDS = (
     "status",
     "error",
 )
+RUN_SUMMARY_FIELDS = (
+    "completed_at",
+    "raw_records",
+    "prepared_records",
+    "sources_with_records",
+    "minimum_records",
+    "activity_record_minimum_met",
+    "analysis_status",
+    "analysis_error",
+    "posts_path",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,7 +195,7 @@ def live_collect(
     progress: Callable[[str], None] = print,
 ) -> LiveResult:
     """Attempt selected sources independently; readiness is not proof of API permission."""
-    selected = list(dict.fromkeys(platforms if platforms is not None else SUPPORTED_PLATFORMS))
+    selected = list(dict.fromkeys(platforms if platforms is not None else PUBLIC_PLATFORMS))
     if not selected or any(platform not in SUPPORTED_PLATFORMS for platform in selected):
         raise DataValidationError(f"Choose a supported source: {', '.join(SUPPORTED_PLATFORMS)}.")
     output_dir = Path(output_dir)
@@ -281,17 +292,6 @@ def live_collect(
         except PipelineError as exc:
             analysis_status, analysis_error = "failed", str(exc)
             progress(f"Analysis failed; collected CSVs are preserved: {exc}")
-    fields = (
-        "completed_at",
-        "raw_records",
-        "prepared_records",
-        "sources_with_records",
-        "minimum_records",
-        "activity_record_minimum_met",
-        "analysis_status",
-        "analysis_error",
-        "posts_path",
-    )
     write_csv(
         output_dir / "run_summary.csv",
         [
@@ -307,7 +307,7 @@ def live_collect(
                 "posts_path": str(prepared_path) if prepared_path else "",
             }
         ],
-        fields,
+        RUN_SUMMARY_FIELDS,
     )
     progress(f"Retained {len(prepared)} unique records. Source report -> {report_path}")
     return LiveResult(

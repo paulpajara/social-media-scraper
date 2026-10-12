@@ -1,0 +1,29 @@
+# Runs immediately without API keys against documented public Bluesky/Mastodon APIs.
+# This is a bounded sample of discussions, requiring manual relevance/stance review.
+[research]
+start_date = "2026-01-01"
+end_date = "2027-01-01"
+max_records = 400
+max_pages = 4
+include_comments = false
+queries = ["Philippines Marcos", "Philippine government", "gobyerno", "pamahalaan"]
+
+[analysis]
+minimum_records = 200
+n_topics = 3
+seed = 42
+max_features = 5000
+top_terms = 10
+max_pairs = 5000
+
+[bluesky]
+# Public AppView search; no account, password, or token required.
+# This deployment returned a public first page but denied cursor pagination.
+# Keep one page per query instead of attempting operations it denied.
+max_pages = 1
+
+[mastodon]
+# Fixed public instance: mastodon.social. Hashtag results cover only its visible network.
+hashtags = ["Philippines", "Marcos", "PhilippinePolitics", "BBM", "PHPolitics", "Gobyerno"]
+government_terms = ["gobyerno", "pamahalaan", "government", "administration", "president", "marcos", "bbm", "duterte"]
+country_terms = ["philippines", "philippine", "pilipinas", "filipino", "pinoy", "gobyerno", "pamahalaan", "bbm"]

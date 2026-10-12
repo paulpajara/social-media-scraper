@@ -1,0 +1,2 @@
+# Preserve exact snapshot bytes so SHA-256 checks work on every operating system.
+deliverables/** -text

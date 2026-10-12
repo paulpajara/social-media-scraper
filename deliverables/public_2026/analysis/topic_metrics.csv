@@ -1,0 +1,10 @@
+﻿metric,topic_id,value,evaluation_scope,notes
+npmi_coherence,0,0.061929878480411024,in_sample_document_presence,Unseen pairs=-1; universal pairs=0; all top-term pairs are averaged.
+npmi_coherence,1,0.4973501290999843,in_sample_document_presence,Unseen pairs=-1; universal pairs=0; all top-term pairs are averaged.
+npmi_coherence,2,0.1852019489109906,in_sample_document_presence,Unseen pairs=-1; universal pairs=0; all top-term pairs are averaged.
+lda_perplexity,,3021.134313198399,in_sample,In-sample fit diagnostic; not held-out topic quality.
+mean_npmi_coherence,,0.24816065216379532,in_sample,Mean of topic NPMI values.
+topic_diversity,,0.9,in_sample,Unique top terms / all selected top-term slots.
+documents_with_features,,335,in_sample,Documents used to fit LDA.
+documents_without_features,,0,in_sample,Not assigned topics.
+vocabulary_size,,4214,in_sample,Retained topic and proximity vocabulary.

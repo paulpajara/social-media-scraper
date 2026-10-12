@@ -1,0 +1,8 @@
+﻿script,output,remarks
+collect-public / collectors.bluesky,raw/bluesky.csv and source manifest,"Live public indexed post search; bounded pages and queries, no credentials."
+collect-public / collectors.mastodon,raw/mastodon.csv and source manifest,Public hashtag timelines visible to mastodon.social; government/country terms need human relevance review.
+prepare / preprocessing.prepare_records,processed/posts.csv; processed/preprocessing_audit.csv,"Date filtering, normalization, empty-text rejection and ID/text deduplication."
+analyze / analysis.analyze,analysis/*.csv,"Three LDA topics by default, rule sentiment, cosine/Jaccard/Euclidean proximity and summaries. Exploratory results."
+label / csvio.write_records,labels/annotation.csv,Blank human annotation template; no automated predictions. Review independently before evaluation.
+evaluate / evaluation.evaluate,data/notebook-run/evaluation/*.csv after human labeling,Pending group work: unseen 90/10 holdout and ten-fold development evaluation; no fabricated scores supplied.
+notebooks/philippine_government_2026.ipynb,data/notebook-run/ derived CSVs; GROUP NAME.ipynb submission copy,"Run offline against this snapshot; complete relevance review, annotations, interpretation and final documentation."
