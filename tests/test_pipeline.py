@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from ph_sentiment.cli import main, parser
-from ph_sentiment.config import DEFAULT_CONFIG
+from ph_sentiment.cli import _prepared_input, main, parser
+from ph_sentiment.config import DEFAULT_CONFIG, load_config
 from ph_sentiment.csvio import read_records, write_records
 from ph_sentiment.schema import Record
 
@@ -27,6 +27,18 @@ def sample_records():
             ]
         )
     ]
+
+
+def test_analysis_validation_preserves_canonical_csv_text(tmp_path):
+    # A once-decoded nested entity can still look like an entity. Validation
+    # must not replace the canonical text with a second decoding of that text.
+    records = [
+        Record("1", "bluesky", "2026-06-01T00:00:00+00:00", "government health &amp; services"),
+        Record("2", "mastodon", "2026-06-01T00:00:00+00:00", "public education and teachers"),
+        Record("3", "bluesky", "2026-06-01T00:00:00+00:00", "government transport budgets"),
+    ]
+    path = write_records(tmp_path / "prepared.csv", records)
+    assert _prepared_input(path, load_config(DEFAULT_CONFIG), 3) == records
 
 
 def test_offline_prepare_analyze_label_pipeline(tmp_path: Path):

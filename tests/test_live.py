@@ -266,7 +266,7 @@ def test_successful_empty_collection_is_saved_without_fabricated_rows(
     assert read_records(result.raw_paths[0]) == []
 
 
-def test_default_live_run_uses_only_the_four_main_platforms(
+def test_explicit_live_run_can_select_optional_collectors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, Any]
 ) -> None:
     enable(monkeypatch, *_CREDENTIALS)
@@ -276,7 +276,9 @@ def test_default_live_run_uses_only_the_four_main_platforms(
     platforms = ("threads", "x", "bluesky", "mastodon")
     configured = {platform: FakeCollector(records(platform)) for platform in platforms}
     calls = install_collectors(monkeypatch, configured)
-    result = live.live_collect(config, tmp_path / "run", progress=lambda _: None)
+    result = live.live_collect(
+        config, tmp_path / "run", platforms=platforms, progress=lambda _: None
+    )
 
     supplied = dict(calls)
     assert tuple(supplied) == platforms
@@ -316,10 +318,19 @@ def test_default_live_run_preserves_public_results_without_authenticated_credent
     assert [platform for platform, _ in calls] == ["bluesky", "mastodon"]
     assert result.record_count == 2
     assert {row["platform"]: row["status"] for row in result.statuses} == {
-        "threads": "missing_credentials",
-        "x": "missing_credentials",
         "bluesky": "success",
         "mastodon": "success",
     }
     assert result.prepared_path is not None
     assert {record.platform for record in read_records(result.prepared_path)} == set(configured)
+
+
+def test_default_live_collection_ignores_configured_paid_source_tokens(
+    tmp_path, monkeypatch, config
+):
+    enable(monkeypatch, "threads", "x")
+    configured = {platform: FakeCollector(records(platform)) for platform in live.PUBLIC_PLATFORMS}
+    calls = install_collectors(monkeypatch, configured)
+    result = live.live_collect(config, tmp_path / "run", progress=lambda _: None)
+    assert tuple(platform for platform, _ in calls) == live.PUBLIC_PLATFORMS
+    assert {row["platform"] for row in result.statuses} == set(live.PUBLIC_PLATFORMS)
