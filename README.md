@@ -4,6 +4,8 @@ A Python pipeline and Jupyter notebook for studying public discussions of the Ph
 
 **Start with the committed dataset in [deliverables/public_2026](deliverables/public_2026/): 335 cleaned unique records awaiting relevance review (261 Bluesky, 74 Mastodon), prepared from 289 Bluesky and 75 Mastodon posts.** Group members can run the notebook against this snapshot without social-media credentials or live API requests. X and Threads are excluded from this handoff; their optional adapters remain available in the source code.
 
+**Read the [notebook validation report](deliverables/validation_2026/README.md) before interpreting the supplied outputs.** Execution and numerical checks pass, but provisional assisted review found 184 clearly relevant records, 82 off-target records and 69 requiring context. These screening flags need human confirmation. The minimum of 200 eligible final records is not yet established, topic contamination needs correction, and no-cue neutral predictions are not confirmed neutral opinion. This is an exploratory collection/code handoff for review and annotation, not a completed sentiment study.
+
 The code covers the supplied midterm activity's computational stages. Independent human labeling, interpretation, the final report, and the peer-evaluation form remain group work. Sentiment predictions are not ground truth or an objective measure of government performance.
 
 ## Group handoff: run the notebook

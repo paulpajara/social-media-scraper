@@ -16,6 +16,8 @@ Use a sampling log to record collection time, search vocabulary, requested platf
 
 ## Offline group handoff
 
+The [validation report](../deliverables/validation_2026/README.md) documents an actual offline notebook execution and semantic screening of every supplied candidate. Reproducibility and numeric output checks pass. Provisional assisted review flags 184 clearly relevant records, 82 off-target records and 69 context-dependent records; human confirmation is required and the 200-record final relevance requirement remains pending. One irrelevant education/AI article materially dominates a topic, and all 297 neutral predictions have zero lexical evidence. Relevance filtering, news-versus-opinion review and independent annotation must precede final interpretation. The original snapshot is preserved as the collection record.
+
 The repository includes a reproducible scraper snapshot under `deliverables/public_2026`. Collection on October 12, 2026 returned **289 Bluesky and 75 Mastodon posts**. Preparation retained **335 unique records: 261 Bluesky and 74 Mastodon**; the audit records 24 duplicate-text exclusions and five empty/removed exclusions. These are computationally prepared records awaiting human relevance review, not an automatically established final research corpus. All human labels are blank.
 
 The notebook defaults to this snapshot and does not make live collection requests. Install the package and notebook dependencies as described in the README, select the environment's Python kernel, and run `notebooks/philippine_government_2026.ipynb`. No `.env` setup is required. Working CSV outputs go to `data/notebook-run`; the committed snapshot remains unchanged.
