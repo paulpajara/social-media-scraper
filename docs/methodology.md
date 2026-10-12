@@ -2,41 +2,53 @@
 
 This project studies sentiment **expressed in collected public posts about the Philippine national administration during 2026**. Sentiment is an observation about the selected posts; it is not a representative approval rating, a causal estimate, or an objective measurement of government performance. Performance-related discussion can be grouped into policy topics, but factual performance claims require separate evidence.
 
-The attached *Midterm Activity 1* is used as an assignment reference. The current implementation focuses on collection, preparation, analysis, evaluation, and a reproducible notebook. It does not supply a completed research report or fabricate the required observations.
+The attached *Midterm Activity 1* is used as an assignment reference. The implementation provides collection, preparation, analysis, evaluation code, and a reproducible notebook. The handoff includes real scraper outputs, but independent annotation, final relevance decisions, interpretation, the research report, and peer evaluation remain group responsibilities.
 
 ## Study scope and collection
 
-1. Define an inclusive search vocabulary in `configs/research.example.toml`: administration names and verified aliases, institutions, and relevant policy areas. Include English, Filipino, and Taglish expressions. Keep the query wording and collection dates with the research notes. Avoid selecting only approving or only critical terms.
-2. Use public data accessible through supported official APIs, or import a legitimately obtained CSV into the same schema. The active platforms are **Threads, X, Bluesky, and Mastodon**. Their access, search, and historical coverage limits differ; available results depend on credentials, API permissions, endpoint capabilities, instance visibility, and collection time.
+1. Define an inclusive search vocabulary in `configs/public.example.toml`: administration names and verified aliases, institutions, and relevant policy areas. Include English, Filipino, and Taglish expressions. Keep the query wording and collection dates with the research notes. Avoid selecting only approving or only critical terms. The committed snapshot includes its exact settings in `deliverables/public_2026/config.toml`.
+2. Use public data accessible through supported official APIs, or import a legitimately obtained CSV into the same schema. The project handoff uses **Bluesky and Mastodon only**. X and Threads are outside this collection scope. Public search, instance visibility, retention, and collection time limit coverage differently for each source.
 3. Collect at least **200 final cleaned records from different sources** for the activity. A pilot with fewer records is useful for debugging but does not satisfy that requirement. Count distinct retained records after cleaning, not downloaded rows. Inspect the actual platform distribution; requesting several platforms does not guarantee that each returned usable data.
 4. Use the interval beginning `2026-01-01` and ending before `2027-01-01`, with timestamps normalized consistently. Data collected before the end of 2026 covers only the elapsed portion of that year. Do not describe it as a full-year sample.
 5. Keep all tabular datasets in `.csv` files. Keep raw, prepared, annotated, analyzed, and evaluation datasets separate so each transformation is traceable.
 
 Use a sampling log to record collection time, search vocabulary, requested platform, actual coverage, and failures. Inspect the collection command's diagnostics and preprocessing audit. If a source is inaccessible or returns no usable records, report that limitation and obtain another authorized source. Do not treat an empty source as neutral sentiment.
 
-## One-command live workflow
+## Offline group handoff
 
-The credential-free subset is `python -m ph_sentiment collect-public`, using `configs/public.example.toml`. It collects **Bluesky and Mastodon**, then performs the same CSV preparation and analysis stages. It does not attempt X or Threads. Public search/hashtag visibility limits, query relevance, reporting versus opinion, and language coverage still require review. Compare actual source counts before interpreting cross-platform results.
+The repository includes a reproducible scraper snapshot under `deliverables/public_2026`. Collection on October 12, 2026 returned **289 Bluesky and 75 Mastodon posts**. Preparation retained **335 unique records: 261 Bluesky and 74 Mastodon**; the audit records 24 duplicate-text exclusions and five empty/removed exclusions. These are computationally prepared records awaiting human relevance review, not an automatically established final research corpus. All human labels are blank.
 
-For the recommended automated workflow, create a local `.env` from `.env.example` if one does not already exist, set `X_BEARER_TOKEN` and `THREADS_ACCESS_TOKEN` for the sources you can access, and run:
+The notebook defaults to this snapshot and does not make live collection requests. Install the package and notebook dependencies as described in the README, select the environment's Python kernel, and run `notebooks/philippine_government_2026.ipynb`. No `.env` setup is required. Working CSV outputs go to `data/notebook-run`; the committed snapshot remains unchanged.
+
+Before model outputs are produced, the notebook creates a working blank annotation template at `data/notebook-run/labels/annotation.csv`, preserving an existing annotation file. Independent annotators should use this template without seeing model predictions. Evaluation stays disabled until the template is independently labeled and adjudicated. Then set `RUN_EVALUATION = True` and run the evaluation cells. Blank labels cannot yield meaningful accuracy metrics.
+
+The snapshot includes raw records, source manifests, a cleaned corpus, its preprocessing audit, a blank annotation template, descriptive baseline analysis, source/run summaries, a file-hash manifest, and `script_output_remarks.csv`. Record-level IDs and raw data allow the stages to be traced. `source_summary.csv` describes actual platform distribution and observed publication dates; the retained posts span January 16–October 12, 2026, with uneven month coverage. The dataset does not represent a full-year or balanced sample.
+
+Keep handoff/submission files uncompressed, following the activity's instruction. Rename a submission copy of the notebook to `GROUP NAME.ipynb`. The group must complete the report, interpretation, and peer-evaluation form separately.
+
+## Collect a new public sample
+
+The credential-free command collects **Bluesky and Mastodon**, then performs the same CSV preparation and analysis stages:
 
 ```console
-python -m ph_sentiment collect-live --config configs/research.example.toml
+# Run from the repository root.
+python -m ph_sentiment collect-public --output-dir data/public/my-run
+python -m ph_sentiment handoff --run-dir data/public/my-run --output-dir deliverables/my-new-snapshot --config configs/public.example.toml
 ```
 
-The command attempts **Threads, X, Bluesky, and Mastodon independently**. X and Threads require tokens; Bluesky and Mastodon use public endpoints without credentials. Blank required credentials are reported as `missing_credentials`; they do not produce invented records. Results go to a new timestamped folder under `data/live` by default. Each run writes `collection_report.csv` and `run_summary.csv`; successful or partial sources write `raw/<platform>.csv` and a collection manifest. When records were returned, preparation writes `processed/posts.csv` and `processed/preprocessing_audit.csv`. Analysis runs automatically once the configured retained-record minimum is met (200 by default).
+Collection uses `configs/public.example.toml`; neither source requires a token. Without an explicit output directory, results go to a new timestamped folder under `data/public`. Each run writes `collection_report.csv` and `run_summary.csv`; successful or partial sources write `raw/<platform>.csv` and a collection manifest. When records were returned, preparation writes `processed/posts.csv` and `processed/preprocessing_audit.csv`. Analysis runs automatically once the configured retained-record minimum is met (200 by default). The `handoff` command exports a separate shareable snapshot from a completed run.
 
-Repeat `--platform` to select sources, use `--skip-analysis` to collect and prepare only, or provide `--output-dir` for a specific run folder. Existing CSV outputs require explicit `--overwrite`; a fresh folder preserves earlier runs. Inspect partial-source warnings, retained counts, actual source coverage, and analysis status before interpreting the outputs. Source failures are recorded separately, so a successful multi-source run can still have unavailable platforms. Report their zero counts explicitly. Tokens and placeholders do not establish public coverage.
+Use `--platform bluesky` or `--platform mastodon` to select a single source, or `--skip-analysis` to collect and prepare only. A fresh output folder preserves earlier runs. Inspect partial-source warnings, retained counts, actual source coverage, and analysis status before interpreting the outputs. Source failures are recorded separately; report the platforms that actually contributed data. Public search/hashtag visibility limits, query relevance, reporting versus opinion, and language coverage still require review.
 
-The X research preset requests archive access for the 2026 window. If this access is unavailable, a source failure is recorded rather than silently replacing the requested period with recent search. A recent-search pilot needs an explicitly chosen date window within the last seven days. A Threads token requires approved `threads_keyword_search` permission for public keyword coverage; without approval, results can be limited to the authorized account. Mastodon hashtag timelines reflect content visible to the selected instance. Review these different coverage limits when comparing sources.
+Bluesky's preset uses one result page per query because a later cursor request was denied in the verified deployment. Mastodon hashtag timelines reflect content visible to `mastodon.social`, filtered for country and government terms. Review these different coverage limits when comparing sources. Neither source provides a complete platform-wide history.
 
-The notebook's separate stages remain available for manual imports and review. Set its `LIVE_RUN_DIR` to an automated run's directory to reuse that run's `raw`, `processed`, and `analysis` folders. Keep optional collection disabled when inspecting an existing run.
+The notebook's separate stages remain available for manual imports and review. Change its input snapshot setting only when intentionally using another completed handoff, and keep collection disabled when inspecting existing data. Optional X/Threads adapters are retained in the software for separately scoped use; they are not part of the delivered corpus or the default notebook workflow.
 
 ## Data preparation and quality checks
 
 The `prepare` command applies the configured date restrictions, normalizes records, and excludes unusable or duplicate material. Its audit CSV records preparation outcomes. Search queries guide collection; preparation does not establish political relevance automatically. Inspect retained samples and imported records for relevance before committing to the final corpus; overbroad queries can include unrelated uses of government or political names.
 
-Retain source identity, timestamp, text, and the provenance fields defined by the project schema. Do not add usernames, profile identifiers, or user-level political classifications. Review quoted text before sharing outputs because post text can still contain names or other identifying information.
+Retain platform identity, timestamp, text, and the provenance fields defined by the project schema. No separate profile metadata is collected, but public post IDs, source URLs, and text can identify authors; this snapshot is not anonymous. Do not add user-level political classifications. Review quoted text before sharing outputs because it can contain names or other identifying information.
 
 For the final dataset, inspect:
 
@@ -77,7 +89,7 @@ The baseline uses a versioned English/Filipino/Taglish lexicon with local negati
 
 The rules can miss sarcasm, idioms, code switching, quoted accusations, target ambiguity, and mixed sentiment. They can also detect negative emotional language in a report of a harmful event without establishing that the author criticizes the administration. Do not interpret every predicted negative post as political opposition.
 
-Create `data/labels/annotation.csv` using the `label` command. The template should contain blank human labels and no model predictions. Preserve a completed annotation file; regenerate a template into a new filename if the prepared corpus changes.
+Use the notebook's working template at `data/notebook-run/labels/annotation.csv`, or create a new template with the `label` command. The committed `deliverables/public_2026/labels/annotation.csv` remains the original blank template. Templates contain blank human labels and no model predictions. Preserve completed annotations; regenerate a template into a new filename if the prepared corpus changes.
 
 Use this annotation protocol:
 
@@ -103,22 +115,23 @@ Inspect development errors before making a rule revision. Once the holdout has b
 
 | Script / command | Input | Output | Remarks |
 | --- | --- | --- | --- |
-| `python -m ph_sentiment collect-live` | Research configuration and locally filled credentials | A live run's `raw/`, `processed/`, optional `analysis/`, `collection_report.csv`, and `run_summary.csv` | Recommended one-command workflow; missing credentials, failures, and partial coverage remain explicit. |
-| `python -m ph_sentiment collect` | Research configuration and platform credentials | `data/raw/<platform>.csv` | Public records actually returned by the supported source; collection can be incomplete. |
+| `python -m ph_sentiment collect-public` | Public collection configuration | A run's `raw/`, `processed/`, optional `analysis/`, `collection_report.csv`, and `run_summary.csv` | Bluesky and Mastodon only; no social-media credentials required. |
+| `python -m ph_sentiment handoff` | Completed public run and its configuration | A shareable snapshot such as `deliverables/public_2026` | Raw/prepared records, blank annotation template, summaries, baseline outputs, and file hashes. |
+| `python -m ph_sentiment collect` | Public collection configuration and selected platform | `data/raw/<platform>.csv` | Public records actually returned by Bluesky or Mastodon; collection can be incomplete. |
 | `python -m ph_sentiment prepare` | One or more raw/import CSVs | `data/processed/posts.csv`, `data/processed/preprocessing_audit.csv` | Count the retained rows here toward the minimum 200. |
 | `python -m ph_sentiment analyze` | Prepared CSV | `analyzed_documents.csv` | Normalized records, topic assignment, rule sentiment, score, evidence, and model version. |
 | Same analysis command | Prepared CSV | `topic_terms.csv`, `topic_metrics.csv` | At least three requested topics, top terms, and explicit topic-evaluation scope. |
 | Same analysis command | Prepared CSV | `proximity_pairs.csv` | Cosine, Jaccard, and Euclidean comparisons with pair status. |
 | Same analysis command | Prepared CSV | `sentiment_summary.csv` | Counts and shares by topic, platform, record type, Manila-local month, and label; no population estimate. |
-| `python -m ph_sentiment label` | Prepared CSV | `data/labels/annotation.csv` | Blank human-label template, edited and reviewed by people. |
+| `python -m ph_sentiment label` | Prepared CSV | A working `labels/annotation.csv` | Blank human-label template, independently edited and reviewed by people. |
 | `python -m ph_sentiment evaluate` | Independently annotated CSV | `evaluation_metrics.csv`, `classification_report.csv`, `confusion_matrix.csv` | Holdout and development-fold sentiment metrics. |
 | Same evaluation command | Annotated CSV | `split_assignments.csv`, `evaluation_predictions.csv` | Reproducible split membership and prediction-level error inspection. |
-| Notebook | Configuration plus generated CSVs | Saved notebook cells and CSV previews | `notebooks/philippine_government_2026.ipynb`; rename a submission copy to the instructor's required `GROUP NAME.ipynb`. |
+| Notebook | Bundled public snapshot and its configuration | Working analysis/evaluation CSVs in `data/notebook-run`, notebook cells, and previews | Offline by default; evaluation requires independent labels. Rename a submission copy to `GROUP NAME.ipynb`. |
 
-Analysis files are written under `data/analysis`; evaluation files are written under `data/evaluation` in the notebook workflow. Run `python -m ph_sentiment --help` and the relevant subcommand's `--help` for the complete current options. The README supplies installation, configuration, credential, and import-schema instructions.
+Analysis files are written under `data/notebook-run/analysis`; evaluation files are written under `data/notebook-run/evaluation` in the default notebook workflow. The snapshot's `script_output_remarks.csv` also provides an activity mapping. Run `python -m ph_sentiment --help` and the relevant subcommand's `--help` for the complete current options. The README supplies installation, handoff, collection, and import-schema instructions.
 
 ## Interpretation and final research notes
 
-Complete the notebook's interpretation prompts only after real data and human annotations are available. Report the retained number of records, sources, observed time coverage, sampling procedure, topic naming process, evaluation metrics, and limitations. Include the activity's scripts/outputs/remarks table and evidence-backed discussion in the eventual submission.
+Complete the notebook's interpretation prompts using the real data and independent human annotations. Report the final retained number of records after relevance review, sources, observed time coverage, sampling procedure, topic naming process, evaluation metrics, and limitations. Include the activity's scripts/outputs/remarks table and evidence-backed discussion in the eventual submission. If evaluation has not been run on completed independent labels, report it as pending rather than substituting model predictions.
 
 Restrict findings to this collected corpus. Social media users self-select, platform search APIs impose coverage limits, repeated content can distort counts, and sentiment rules have language and target errors. Different platform shares can reflect collection design. A change in collected sentiment is not evidence that government performance caused the change. Corroborate specific performance questions with documented indicators or primary sources in a separate research step.
