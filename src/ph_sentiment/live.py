@@ -26,6 +26,17 @@ REPORT_FIELDS = (
     "warnings",
     "http_status",
     "error_category",
+    "diagnostics_path",
+)
+QUERY_FIELDS = (
+    "platform",
+    "query",
+    "api_records",
+    "retained_records",
+    "status",
+    "message",
+    "http_status",
+    "error_category",
 )
 MANIFEST_FIELDS = (
     "platform",
@@ -50,6 +61,10 @@ class CollectionResult:
     warnings: str
     status: str
     error: str = ""
+    http_status: int | str = ""
+    error_category: str = ""
+    empty_reason: str = ""
+    diagnostics_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,17 +104,31 @@ def collect_to_csv(platform: str, config: dict, output: Path) -> CollectionResul
     options = collector_config(platform, config)
     collector = make_collector(platform, options)
     error = ""
+    failure: PipelineError | None = None
+    diagnostics_path: Path | None = None
     try:
         try:
             records = collector.collect()
         except PipelineError as exc:
+            failure = exc
             if not collector.records:
                 raise
             records = list(collector.records)
             error = str(exc)
         warnings = " | ".join(collector.warnings)
     finally:
-        collector.close()
+        try:
+            if hasattr(collector, "query_diagnostics"):
+                diagnostics_path = output.with_name(f"{output.stem}_query_diagnostics.csv")
+                write_csv(
+                    diagnostics_path,
+                    collector.query_diagnostics,
+                    QUERY_FIELDS,
+                )
+                if failure is not None:
+                    failure.diagnostics_path = diagnostics_path
+        finally:
+            collector.close()
     for record in records:
         record.validate()
     status = "partial" if error else "success" if records else "empty"
@@ -126,7 +155,24 @@ def collect_to_csv(platform: str, config: dict, output: Path) -> CollectionResul
         ],
         MANIFEST_FIELDS,
     )
-    return CollectionResult(records, warnings, status, error)
+    empty_reason = ""
+    if not records:
+        messages = [
+            row["message"]
+            for row in getattr(collector, "query_diagnostics", [])
+            if row.get("status") in {"empty_api", "filtered_empty"}
+        ]
+        empty_reason = " | ".join(dict.fromkeys(messages))
+    return CollectionResult(
+        records,
+        warnings,
+        status,
+        error,
+        getattr(failure, "status_code", ""),
+        getattr(failure, "category", ""),
+        empty_reason,
+        diagnostics_path,
+    )
 
 
 def live_collect(
@@ -162,6 +208,7 @@ def live_collect(
             "warnings": "",
             "http_status": "",
             "error_category": "",
+            "diagnostics_path": "",
         }
         missing = [
             name
@@ -174,9 +221,11 @@ def live_collect(
         else:
             progress(f"{platform}: collecting live public records...")
             raw_path = output_dir / "raw" / f"{platform}.csv"
+            diagnostics_path = None
             try:
                 result = collect_to_csv(platform, config, raw_path)
             except PipelineError as exc:
+                diagnostics_path = exc.diagnostics_path
                 row.update(
                     status="failed",
                     message=str(exc),
@@ -185,18 +234,25 @@ def live_collect(
                 )
                 progress(f"{platform}: {exc}")
             else:
+                diagnostics_path = result.diagnostics_path
                 all_records.extend(result.records)
                 raw_paths.append(raw_path)
                 row.update(
                     status=result.status,
                     record_count=len(result.records),
                     output_path=str(raw_path),
-                    message=result.error,
+                    message=result.error or result.empty_reason,
                     warnings=result.warnings,
+                    http_status=result.http_status,
+                    error_category=result.error_category,
                 )
                 progress(
                     f"{platform}: {result.status}, {len(result.records)} records -> {raw_path}"
                 )
+                if result.empty_reason:
+                    progress(f"{platform}: {result.empty_reason}")
+            if diagnostics_path is not None:
+                row["diagnostics_path"] = str(diagnostics_path)
         statuses.append(row)
         # Each source checkpoints immediately; failures do not erase successful sources.
         write_csv(report_path, statuses, REPORT_FIELDS)

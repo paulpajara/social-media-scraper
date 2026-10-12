@@ -25,6 +25,7 @@ def parser() -> argparse.ArgumentParser:
         ("collect", "Collect one Threads, X, Bluesky, or Mastodon source through its API"),
         ("collect-live", "Collect available live sources, prepare CSVs, and analyze when ready"),
         ("collect-public", "Run credential-free Bluesky/Mastodon collection and CSV analysis"),
+        ("check-access", "Check Threads token permissions and X credits without searching posts"),
         ("prepare", "Merge canonical CSV exports, clean, filter, and deduplicate"),
         ("analyze", "Compute topics, rule-based sentiment, and proximity measures"),
         ("label", "Create a blank human annotation CSV without model predictions"),
@@ -39,7 +40,10 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--overwrite", action="store_true", help="Explicitly replace existing outputs"
         )
-        if name in {"collect-live", "collect-public"}:
+        if name == "check-access":
+            command.add_argument("--platform", choices=("threads", "x"), action="append")
+            command.add_argument("--output", type=Path, required=True)
+        elif name in {"collect-live", "collect-public"}:
             command.add_argument(
                 "--platform",
                 choices=PUBLIC_PLATFORMS if name == "collect-public" else SUPPORTED_PLATFORMS,
@@ -133,6 +137,17 @@ def _prepared_input(path: Path, config: dict, minimum: int) -> list[Record]:
 
 
 def run(args: argparse.Namespace) -> None:
+    if args.command == "check-access":
+        from .access import ACCESS_PLATFORMS, check_access
+
+        _check_outputs([args.output], [], args.overwrite)
+        rows = check_access(args.output, args.platform or ACCESS_PLATFORMS)
+        print(f"Access report -> {args.output}")
+        if any(row["status"] in {"blocked", "unverified", "missing_credentials"} for row in rows):
+            raise DataValidationError(
+                "Access is blocked or unverified; follow the actions in the access CSV."
+            )
+        return
     config = load_config(args.config)
     research = config["research"]
     if args.command in {"collect-live", "collect-public"}:
@@ -171,7 +186,8 @@ def run(args: argparse.Namespace) -> None:
         from .live import collect_to_csv
 
         manifest = args.output.with_name(f"{args.output.stem}_collection_manifest.csv")
-        _check_outputs([args.output, manifest], [], args.overwrite)
+        diagnostics = args.output.with_name(f"{args.output.stem}_query_diagnostics.csv")
+        _check_outputs([args.output, manifest, diagnostics], [], args.overwrite)
         result = collect_to_csv(args.platform, config, args.output)
         records, collection_warnings = result.records, result.warnings
         if collection_warnings:
@@ -182,9 +198,9 @@ def run(args: argparse.Namespace) -> None:
                 f"Partial records preserved; collection was incomplete: {result.error}"
             )
         if not records:
-            print(
-                "No matching records returned. Check queries, date range, and API access.",
-                file=sys.stderr,
+            raise DataValidationError(
+                "No records collected. "
+                + (result.empty_reason or "Check queries, date range, and API access.")
             )
     elif args.command == "prepare":
         _check_outputs([args.output, args.audit_output], args.input, args.overwrite)

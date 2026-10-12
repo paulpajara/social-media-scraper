@@ -101,6 +101,55 @@ def api_url(url: str) -> str:
     return url
 
 
+def http_error(status: int, host: str | None, payload: Any) -> HTTPCollectionError:
+    """Map only recognized error codes to fixed text; discard upstream details."""
+    category = {401: "authentication", 402: "payment_required", 403: "permission"}.get(
+        status, "http_error"
+    )
+    message = {
+        401: "API returned HTTP 401; regenerate a valid token locally.",
+        402: "API returned HTTP 402 Payment Required; check API credits, billing, and endpoint access.",
+        403: "API returned HTTP 403; check app approval and endpoint read permissions.",
+    }.get(status, f"API returned HTTP {status}; check collection settings and API access.")
+    if isinstance(payload, dict) and host == "api.x.com":
+        problem_type = payload.get("type")
+        if not isinstance(problem_type, str):
+            problem_type = ""
+        if status == 402 and (
+            payload.get("title") == "CreditsDepleted"
+            or problem_type
+            in {
+                "https://api.x.com/2/problems/credits-depleted",
+                "https://api.twitter.com/2/problems/credits-depleted",
+            }
+        ):
+            category = "credits_depleted"
+            message = (
+                "X returned HTTP 402 CreditsDepleted. Check Billing/Credits in the X Developer "
+                "Console and restore available credits before retrying. Recent search also uses credits."
+            )
+        elif status == 403 and problem_type in {
+            "https://api.x.com/2/problems/client-forbidden",
+            "https://api.twitter.com/2/problems/client-forbidden",
+        }:
+            category = "endpoint_access"
+            message = "X denied this endpoint to the app; check its search entitlement in the Developer Console."
+    elif isinstance(payload, dict) and host == "graph.threads.net":
+        error = payload.get("error")
+        code = error.get("code") if isinstance(error, dict) else None
+        if isinstance(code, bool) or not isinstance(code, int):
+            code = None
+        if status in {400, 401, 403} and code == 190:
+            category = "authentication"
+            message = (
+                "Threads token is invalid or expired; regenerate THREADS_ACCESS_TOKEN locally."
+            )
+        elif status in {400, 403} and code in {10, 200}:
+            category = "permission_missing"
+            message = "Threads denied this operation; check token scopes and public-search App Review approval."
+    return HTTPCollectionError(status, category, message)
+
+
 class HTTPClient:
     """Reusable Requests session with timeouts, bounded retries and safe failures.
 
@@ -204,27 +253,14 @@ class HTTPClient:
                     raise CollectionError(f"API returned HTTP {status} after bounded retries.")
                 self._wait(headers, attempt)
                 continue
-            if status in {401, 403}:
-                response.close()
-                raise HTTPCollectionError(
-                    status,
-                    "authentication" if status == 401 else "permission",
-                    f"API returned HTTP {status}; check token validity, app approval and read permissions.",
-                )
-            if status == 402:
-                response.close()
-                raise HTTPCollectionError(
-                    status,
-                    "payment_required",
-                    "API returned HTTP 402 Payment Required; check API credits, billing, and endpoint access.",
-                )
             if not 200 <= status < 300:
-                response.close()
-                raise HTTPCollectionError(
-                    status,
-                    "http_error",
-                    f"API returned HTTP {status}; check collection settings and API access.",
-                )
+                try:
+                    error_payload = response.json()
+                except (ValueError, requests.RequestException):
+                    error_payload = None
+                finally:
+                    response.close()
+                raise http_error(status, urlsplit(url).hostname, error_payload)
             try:
                 payload = response.json()
             except (ValueError, requests.RequestException):
@@ -282,6 +318,7 @@ class Collector:
         )
         self.warnings: list[str] = []
         self.records: list[Record] = []
+        self.query_diagnostics: list[dict[str, Any]] = []
         self._seen: set[str] = set()
         self.collected_at = iso_utc(datetime.now(UTC))
 
