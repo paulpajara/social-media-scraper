@@ -16,6 +16,8 @@ Use a sampling log to record collection time, search vocabulary, requested platf
 
 ## One-command live workflow
 
+The credential-free alternative is `python -m ph_sentiment collect-public`, using `configs/public.example.toml`. It collects **Bluesky and Mastodon**, then performs the same CSV preparation and analysis stages. These platform names remain in the dataset and summaries; their posts must not be described as observations from Reddit, X, Threads, or Facebook. Public search/hashtag visibility limits, query relevance, reporting versus opinion, and language coverage still require review. Compare source counts before interpreting cross-platform results.
+
 For the recommended automated workflow, copy `.env.example` to a local `.env`, fill the credentials for the sources you can access, and run:
 
 ```console

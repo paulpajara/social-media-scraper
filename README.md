@@ -4,6 +4,22 @@ A Python command-line pipeline and notebook for collecting public social-media d
 
 The implementation follows the supplied midterm activity's computational requirements. The documentation PDF and peer-evaluation form are outside this code-focused phase. Rename a submission copy of the notebook to your actual `GROUP NAME.ipynb`.
 
+## Run now without credentials
+
+After installation, this command collects real public posts from **Bluesky and Mastodon**, prepares the CSV dataset, and runs topic/sentiment/proximity analysis when at least 200 valid unique records are available:
+
+```powershell
+./.venv/Scripts/python.exe -m ph_sentiment collect-public
+```
+
+No signup, access token, or `.env` value is required for this public-source command. It uses `configs/public.example.toml` and creates a new timestamped directory under `data/public/`. Use `--output-dir data/public/my-run` for a chosen folder, `--platform bluesky` to select one source, or `--skip-analysis` to collect and prepare only. Each run saves real raw records, source manifests/statuses, a preprocessing audit, a cleaned CSV, and the analysis CSVs when the configured minimum is reached.
+
+These are additional social-media sources, with their platform names preserved in every record. They do not supply Reddit, X, Threads, or Facebook data. Search/hashtag results form a bounded discussion sample; review relevance and distinguish news/reporting from expressed opinions before using it as the final research corpus. Mastodon requires public preview on the configured instance and filters hashtag posts for both country and government terms. Public API access can change, and an empty or failed source is reported without inventing rows.
+
+Bluesky requests use its documented public AppView at `api.bsky.app`; Mastodon uses the public `mastodon.social` hashtag timelines. References: [Bluesky API hosts](https://bsky.network/docs/api-directory/), [Bluesky search schema](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/searchPosts.json), [Mastodon public timelines](https://docs.joinmastodon.org/methods/timelines/).
+
+The public preset limits Bluesky to one page per configured query because the verified deployment denied a later cursor request. Source-level `max_pages` can override the shared page budget. The manifest records the effective budget and query list; result coverage is deliberately bounded.
+
 ## Install (PowerShell, Python 3.11+)
 
 ```powershell
@@ -68,7 +84,7 @@ If API access is unavailable, supply an independently obtained public/authorized
 | Column | Requirement |
 | --- | --- |
 | `record_id` | Required stable record ID, unique together with platform |
-| `platform` | Required: `reddit`, `x`, `threads`, `facebook`, `news`, `blog`, or `other` |
+| `platform` | Required: `reddit`, `x`, `threads`, `facebook`, `bluesky`, `mastodon`, `news`, `blog`, or `other` |
 | `created_at` | Required timezone-aware ISO timestamp, e.g. `2026-06-01T12:00:00Z` |
 | `text` | Required nonempty post/comment text; quote commas and multiline text correctly |
 | `source_url` | Optional public HTTPS provenance URL |
