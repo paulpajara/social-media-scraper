@@ -33,7 +33,6 @@ For the group:
 1. Run all notebook cells. The notebook checks at least **200 curated unique records from different sources**, complete reference labels, and the class counts needed for ten-fold development validation.
 2. Read the source/curation summaries and annotation decisions/context; describe the AI-assisted procedure and coverage limits honestly in the methodology.
 3. Name and interpret the topics, inspect actual proximity examples, and discuss evaluation errors and reference-label limitations. Keep development and holdout scores separate.
-4. Complete the report and peer-evaluation form, and rename a submission copy to the instructor's required `GROUP NAME.ipynb`.
 
 The default run produces all analysis and evaluation outputs from supplied labels. The notebook displays supplied reference summaries separately from `analysis/sentiment_summary.csv`, which counts the fixed rule predictions. The reference `content_kind` distinguishes news/commentary purpose; reference polarity may use available public embed context, while the rule model uses canonical post text only. Do not replace reference labels with rule predictions; that would make the evaluation circular.
 
